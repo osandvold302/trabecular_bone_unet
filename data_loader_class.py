@@ -117,12 +117,14 @@ class data_generator:
                     )
 
                 else:
+                    # TODO: add dim for # z slices
                     raise ValueError("HAVENT PROGRAMMED 3D")
 
             if self.is_2d:
                 img_stack[counter, 0, :, :] = img[:, :, 29]
                 kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
+                # TODO: Need to grab all images, not just center slice
                 raise ValueError("Haven't coded 3D section yet!!!!!!")
 
         # self.image_mean = img_stack.mean()
@@ -158,6 +160,7 @@ class data_generator:
             # Randomize the order of the data set
 
             # Dumb Fix for how to randomize the list of patient names
+            # TODO: Possible one liner here
             old_names_list = names_list
             names_list = []
             for counter in range(total_images):
