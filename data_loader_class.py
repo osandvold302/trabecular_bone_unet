@@ -348,6 +348,13 @@ class data_generator:
         distance_penalty = self.distance_penalty
         center_maintained = self.center_maintained
 
+        # NOTE: Need to think of a way to optimize this for 3D slices?
+        # Current implementation loops over all single center slice images and
+        # adds the optimal undersampled kspace pdf to dataset
+
+        # For 3D we want to generate TWO undersampled kspace "images"
+        # Can we assume the optimal horizontal and 3rd dim pdf combined are optimal?
+
         (num_slices, num_channels, img_height, img_width) = full_kspace.shape
         undersampling_factor = 1.0 / acceleration_factor
 
@@ -497,6 +504,8 @@ class data_generator:
 
             iter_num += 1
 
+        # TODO: 3D implementation for anisotropic volumes    
+
         return pdf, check_point
 
     def gen_sampling_mask(self, pdf, max_iter=150, sample_tol=0.5):
@@ -580,6 +589,8 @@ class data_generator:
 
 
 if __name__ == "__main__":
+
+    # TODO: Add command line option to run 3D processing
 
     def img_to_kspace(img):
         return fft.ifftshift(fft.fftn(fft.fftshift(img)))
