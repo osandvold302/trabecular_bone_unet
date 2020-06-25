@@ -42,7 +42,7 @@ class data_generator:
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
-        bool_2d=True,
+        bool_2d=True, # TODO: Needs to be set via command line argument
         poly_distance_order=4,  # Polynomial fit for L1/L2 distance matrix
         distance_penalty=2,  # L1 or L2. But it must be L1 for 2D case iirc
         center_maintained=0,  # Percent of center of kspace that must be sampled
@@ -118,6 +118,7 @@ class data_generator:
 
                 else:
                     # TODO: add dim for # z slices
+                    # NUM_SCANS = total in dataset? Confer with Brandon
                     raise ValueError("HAVENT PROGRAMMED 3D")
 
             if self.is_2d:
@@ -125,8 +126,12 @@ class data_generator:
                 kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
                 # TODO: Need to grab all images, not just center slice
+                # TOTAL SIZE OF SCAN: (height, width, 57?)
                 raise ValueError("Haven't coded 3D section yet!!!!!!")
 
+        '''
+        Standarization completed in earlier section for 2D--remove commented out code?
+        '''
         # self.image_mean = img_stack.mean()
         # self.image_std = img_stack.std()
 
@@ -185,6 +190,12 @@ class data_generator:
             self.valid_names = valid_names
             self.valid_images = valid_images
             self.valid_kspace = valid_kspace
+
+        elif not self.is_2d:
+            # same process, just need to extract one more variable from the images obj
+            (total_images, num_slices, num_channels, img_height, img_width) = images.shape
+            # TODO: set variables before shuffling and setting train/validate data
+            # Probably just move this elif statement to the beginning of this function
 
     def get_batch(self):
         print("\n Getting batch . . . \n")
