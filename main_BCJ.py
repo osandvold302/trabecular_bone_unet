@@ -14,6 +14,8 @@
 ###############################
 ###############################
 
+import argparse
+
 import tensorflow as tf
 import numpy as np
 from tensorflow.python.ops.signal.fft_ops import fft2d, ifft2d, fftshift, ifftshift
@@ -297,6 +299,15 @@ def simple_cnn(input_shape):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
+    parser.add_argument('--2d', dest='run2d', action='store_true')
+    parser.add_argument('--3d', dest='run2d', action='store_false')
+    parser.set_defaults(run2d=True)
+
+    args = parser.parse_args()
+
+    run2d = args.run2d
+
     """
         Tests the CNN.
 
@@ -304,6 +315,7 @@ def main():
 
     model = CNN(
         input_shape=(50, 50, 50, 1),
+        bool_2d=run2d
         # (
         #     tf.layers.conv3d,
         #     {
