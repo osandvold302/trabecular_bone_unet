@@ -58,7 +58,7 @@ from data_loader_class import data_generator
 
 
 class CNN(tf.Module):
-    def __init__(self, input_shape, *layerinfo):
+    def __init__(self, input_shape, bool_2d=True ,*layerinfo):
         """
             Defines the CNN structure
 
@@ -84,6 +84,8 @@ class CNN(tf.Module):
 
         self.learn_rate = 1e-3
         self.max_epoch = 2
+
+        self.bool_2d = bool_2d
 
 
     def forward_pass(self, input):
@@ -158,7 +160,7 @@ class CNN(tf.Module):
         # NOTE: THE CODE BELOW IS THE ACTUAL TRAINING LOOP ITERATION
         # Will need to be modified to work for tensorflow
 
-        my_generator = data_generator()
+        my_generator = data_generator(bool_2d=self.bool_2d)
 
         (
             train_images,
@@ -300,13 +302,13 @@ def simple_cnn(input_shape):
 
 def main():
     parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
-    parser.add_argument('--2d', dest='run2d', action='store_true')
-    parser.add_argument('--3d', dest='run2d', action='store_false')
-    parser.set_defaults(run2d=True)
+    parser.add_argument('--2d', dest='run_2d', action='store_true')
+    parser.add_argument('--3d', dest='run_2d', action='store_false')
+    parser.set_defaults(run_2d=True)
 
     args = parser.parse_args()
 
-    run2d = args.run2d
+    run_2d = args.run_2d
 
     """
         Tests the CNN.
@@ -315,7 +317,7 @@ def main():
 
     model = CNN(
         input_shape=(50, 50, 50, 1),
-        bool_2d=run2d
+        bool_2d=run_2d
         # (
         #     tf.layers.conv3d,
         #     {

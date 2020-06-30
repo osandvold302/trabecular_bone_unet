@@ -23,6 +23,7 @@ import numpy.fft as fft
 import numpy.matlib
 import os
 import tensorflow as tf
+import argparse
 
 #############
 #############
@@ -42,7 +43,7 @@ class data_generator:
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
-        bool_2d=True, # TODO: Needs to be set via command line argument
+        bool_2d=True,
         poly_distance_order=4,  # Polynomial fit for L1/L2 distance matrix
         distance_penalty=2,  # L1 or L2. But it must be L1 for 2D case iirc
         center_maintained=0,  # Percent of center of kspace that must be sampled
@@ -590,7 +591,14 @@ class data_generator:
 
 if __name__ == "__main__":
 
-    # TODO: Add command line option to run 3D processing
+    parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
+    parser.add_argument('--2d', dest='run_2d', action='store_true')
+    parser.add_argument('--3d', dest='run_2d', action='store_false')
+    parser.set_defaults(run_2d=True)
+
+    args = parser.parse_args()
+
+    run_2d = args.run_2d
 
     def img_to_kspace(img):
         return fft.ifftshift(fft.fftn(fft.fftshift(img)))
@@ -598,8 +606,7 @@ if __name__ == "__main__":
     def kspace_to_img(kspace):
         return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
-    the_generator = data_generator()  # Default parameters go in here
-    print('aaaa')
+    the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
 
     gen_tf = True
 
