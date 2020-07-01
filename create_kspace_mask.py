@@ -9,7 +9,7 @@
 #########
 #########      FOR COMPRESSED SENSING RETROSPECITVE UNDERSAMPLING OF KSPACE
 #########
-#########       ADAPTED FROM SIRKANT IYER'S MATLAB CODE
+#########       ADAPTED FROM SRIKANT IYER'S MATLAB CODE
 #########
 #########
 #########       Based On Miki Lustig's Monte Carlo Method
