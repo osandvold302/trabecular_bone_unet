@@ -63,11 +63,8 @@ class data_generator:
         self.distance_penalty = distance_penalty
         self.center_maintained = center_maintained
 
-        if self.is_2d:
-
-            (images_full, kspace_full, patient_names) = self.load_data()
-
-            self.split_train_and_valid(images_full, kspace_full, patient_names)
+        (images_full, kspace_full, patient_names) = self.load_data()
+        self.split_train_and_valid(images_full, kspace_full, patient_names)
 
     def load_data(self):
         # print("\nLoading images and kspace . . . \n")
@@ -118,9 +115,18 @@ class data_generator:
                     )
 
                 else:
-                    # TODO: add dim for # z slices
-                    # NUM_SCANS = total in dataset? Confer with Brandon
-                    raise ValueError("HAVENT PROGRAMMED 3D")
+                    # NOTE: OUTPUT HAS SHAPE
+                    # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
+                    # (NUM_SCANS, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
+                    # (94, 1, 512, 512, 30)
+
+                    img_stack = np.zeros(
+                        (num_scans, 1, img_height, img_width, num_slices), dtype=np.double
+                    )
+                    kspace_stack = np.zeros(
+                        (num_scans, 1, img_height, img_width, num_slices), dtype=np.cdouble
+                    )
+
 
             if self.is_2d:
                 img_stack[counter, 0, :, :] = img[:, :, 29]
