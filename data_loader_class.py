@@ -63,6 +63,7 @@ class data_generator:
         self.distance_penalty = distance_penalty
         self.center_maintained = center_maintained
 
+        # Will have dimensions (94, 1, 512, 512) or (94, 1, 512, 512, 60) depending on 2d/3d
         (images_full, kspace_full, patient_names) = self.load_data()
         self.split_train_and_valid(images_full, kspace_full, patient_names)
 
@@ -118,7 +119,7 @@ class data_generator:
                     # NOTE: OUTPUT HAS SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
                     # (NUM_SCANS, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
-                    # (94, 1, 512, 512, 30)
+                    # (94, 1, 512, 512, 60)
 
                     img_stack = np.zeros(
                         (num_scans, 1, img_height, img_width, num_slices), dtype=np.double
@@ -132,9 +133,9 @@ class data_generator:
                 img_stack[counter, 0, :, :] = img[:, :, 29]
                 kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
-                # TODO: Need to grab all images, not just center slice
-                # TOTAL SIZE OF SCAN: (height, width, 57?)
-                raise ValueError("Haven't coded 3D section yet!!!!!!")
+                # TODO: Check img_to_kspace can handle 3d volumes
+                img_stack[counter, 0, :, :, :] = img
+                kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
 
         '''
         Standarization completed in earlier section for 2D--remove commented out code?
@@ -613,6 +614,9 @@ if __name__ == "__main__":
         return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
     the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
+
+    # DEBUG
+    wait = input("GENERATOR INIT WORKED")
 
     gen_tf = True
 
