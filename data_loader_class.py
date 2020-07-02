@@ -39,7 +39,7 @@ from create_kspace_mask import gen_pdf, gen_sampling_mask, view_mask_and_pdfs
 class data_generator:
     def __init__(
         self,
-        study_dir="E:\\SPGR_AF2_242_242_1500_um\\",
+        study_dir="E:\\SPGR_AF2_242_242_1500_um\\", # will change to Linux paths
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
@@ -160,9 +160,9 @@ class data_generator:
     def split_train_and_valid(self, images, kspace, names_list):
         print("\nSplitting Training And Valid Data . . . \n")
 
-        if self.is_2d:
+        (total_images, num_channels, img_height, img_width) = images.shape
 
-            (total_images, num_channels, img_height, img_width) = images.shape
+        if self.is_2d:
 
             num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
             num_train = int(total_images - num_valid)
@@ -201,7 +201,7 @@ class data_generator:
 
         elif not self.is_2d:
             # same process, just need to extract one more variable from the images obj
-            (total_images, num_slices, num_channels, img_height, img_width) = images.shape
+            (_, _, _, _, num_slices) = images.shape
             # TODO: set variables before shuffling and setting train/validate data
             # Probably just move this elif statement to the beginning of this function
 
@@ -363,13 +363,13 @@ class data_generator:
         # For 3D we want to generate TWO undersampled kspace "images"
         # Can we assume the optimal horizontal and 3rd dim pdf combined are optimal?
 
-        (num_slices, num_channels, img_height, img_width) = full_kspace.shape
+        (num_scans, num_channels, img_height, img_width) = full_kspace.shape
         undersampling_factor = 1.0 / acceleration_factor
 
         undersampled_kspace = np.zeros(full_kspace.shape, dtype=np.cdouble)
         mask_3d = np.zeros(full_kspace.shape, dtype=np.bool)
 
-        for counter in range(num_slices):
+        for counter in range(num_scans):
             (pdf, offset_value) = gen_pdf(
                 img_size=(1, img_width),
                 poly_order=polynomial_order,
@@ -670,11 +670,11 @@ if __name__ == "__main__":
         # print(train_images.shape)
         # print(train_kspace.shape)
 
-        (img_height, img_width, num_slices) = train_images.shape
+        (img_height, img_width, num_scans) = train_images.shape
 
         train_downsampled_img = np.zeros(train_images.shape)
 
-        for cc in range(num_slices):
+        for cc in range(num_scans):
             train_downsampled_img[:, :, cc] = kspace_to_img(
                 train_kspace_undersampled[:, :, cc]
             )
