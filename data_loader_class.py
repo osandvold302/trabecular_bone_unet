@@ -39,7 +39,7 @@ from create_kspace_mask import gen_pdf, gen_sampling_mask, view_mask_and_pdfs
 class data_generator:
     def __init__(
         self,
-        study_dir="E:\\SPGR_AF2_242_242_1500_um\\", # will change to Linux paths
+        study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
@@ -71,7 +71,8 @@ class data_generator:
         # print("\nLoading images and kspace . . . \n")
 
         study_dir = self.study_dir
-        scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
+        # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
+        scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
 
         scan_name_list = []
 
@@ -84,12 +85,14 @@ class data_generator:
             scan_name_list.append(scan_name)
 
         num_scans = len(scan_files)
+        print("num scans:" + str(num_scans))
 
         for counter in range(num_scans):
 
             img = loadmat(scan_files[counter])
 
-            img = img["img"]
+            # img = img["img"]
+            img = img["D"] # NOTE: matfile has "D" key not "img"
 
             if self.standardize_data:
                 img_mean = img.mean()
