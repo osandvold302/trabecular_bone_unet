@@ -336,10 +336,10 @@ class data_generator:
 
             train_arange = np.arange(total_train)
             np.random.shuffle(train_arange)
-
-            train_names = []
-            for counter in range(total_train):
-                train_names.append(train_names_old[train_arange[counter]])
+            
+            train_names = np.array(train_names_old)
+            train_names = train_names_new[train_arange]
+            train_names = list(train_names_new)
 
             self.train_names = train_names
             self.train_images = train_images[train_arange, :, :, :]
@@ -356,10 +356,9 @@ class data_generator:
             valid_arange = np.arange(total_valid)
             np.random.shuffle(valid_arange)
 
-            valid_names = []
-
-            for counter in range(total_valid):
-                train_names.append(valid_names_old[valid_arange[counter]])
+            valid_names = np.array(valid_names_old)
+            valid_names = valid_names[valid_arange]
+            valid_names = list(valid_names)
 
             self.valid_names = valid_names
             self.valid_images = valid_images[valid_arange, :, :, :]
@@ -630,9 +629,6 @@ if __name__ == "__main__":
         return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
     the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
-
-    # DEBUG
-    wait = input("GENERATOR INIT WORKED")
 
     gen_tf = True
 
