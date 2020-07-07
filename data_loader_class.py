@@ -72,8 +72,8 @@ class data_generator:
 
         study_dir = self.study_dir
         # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        #scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
-        scan_files = glob.glob(study_dir + "2014_09_10_SINGH_COR_AF2/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
+        #scan_files = glob.glob(study_dir + "2014_09_10_SINGH_COR_AF2/data/dataFile.mat")
 
         scan_name_list = []
 
@@ -165,7 +165,6 @@ class data_generator:
         print("\nSplitting Training And Valid Data . . . \n")
 
         total_images = len(names_list) # assumption that names = total num
-        #(total_images, num_channels, img_height, img_width) = images.shape
         num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
         num_train = int(total_images - num_valid)
         
@@ -174,21 +173,11 @@ class data_generator:
         total_arange = total_arange.astype(np.int16)
         # Randomize the order of the data set
 
+        names_list = np.array(names_list)
+        names_list = names_list[total_arange]
+        names_list = list(names_list)
+
         if self.is_2d:
-
-            # Dumb Fix for how to randomize the list of patient names
-            names_list_new = np.array(names_list)
-            names_list_new = names_list_new[total_arange]
-            names_list_new = list(names_list_new)
-
-
-            old_names_list = names_list
-            names_list = []
-            for counter in range(total_images):
-                names_list.append(old_names_list[total_arange[counter]])
-            
-            # TODO: Check if shuffled correctly
-            print("3 liner = 4 liner: " + str(names_list == names_list_new))
 
             images = images[total_arange, :, :, :]
             kspace = kspace[total_arange, :, :, :]
@@ -210,9 +199,26 @@ class data_generator:
             self.valid_images = valid_images
             self.valid_kspace = valid_kspace
 
-        elif not self.is_2d:
-            # same process, just need to extract one more variable from the images obj
-            (_, _, _, _, num_slices) = images.shape
+        else:
+            images = images[total_arange, :, :, :, :]
+            kspace = kspace[total_arange, :, :, :, :]
+
+            # Now split into training and validation data
+            train_names = names_list[:num_train]
+            train_images = images[:num_train, :, :, :, :]
+            train_kspace = kspace[:num_train, :, :, :, :]
+
+            valid_names = names_list[num_train + 1 :]
+            valid_images = images[num_train + 1 :, :, :, :, :]
+            valid_kspace = kspace[num_train + 1 :, :, :, :, :]
+
+            self.train_names = train_names
+            self.train_images = train_images
+            self.train_kspace = train_kspace
+
+            self.valid_names = valid_names
+            self.valid_images = valid_images
+            self.valid_kspace = valid_kspace
 
 
     def get_batch(self):
