@@ -338,8 +338,8 @@ class data_generator:
             np.random.shuffle(train_arange)
             
             train_names = np.array(train_names_old)
-            train_names = train_names_new[train_arange]
-            train_names = list(train_names_new)
+            train_names = train_names[train_arange]
+            train_names = list(train_names)
 
             self.train_names = train_names
             self.train_images = train_images[train_arange, :, :, :]
@@ -363,6 +363,49 @@ class data_generator:
             self.valid_names = valid_names
             self.valid_images = valid_images[valid_arange, :, :, :]
             self.valid_kspace = valid_kspace[valid_arange, :, :, :]
+
+        else:
+            (total_train, num_channels, img_height, img_width, num_slices) = self.train_images.shape
+            (total_valid, num_channels, img_height, img_width, num_slices) = self.valid_images.shape
+
+            ########
+            ######## RANDOMIZE THE ORDER OF THE TRAIN DATA
+            ########
+
+            train_images = self.train_images
+            train_kspace = self.train_kspace
+            train_names_old = self.train_names
+
+            train_arange = np.arange(total_train)
+            np.random.shuffle(train_arange)
+            
+            train_names = np.array(train_names_old)
+            train_names = train_names[train_arange]
+            train_names = list(train_names)
+
+            self.train_names = train_names
+            self.train_images = train_images[train_arange, :, :, :, :]
+            self.train_kspace = train_kspace[train_arange, :, :, :, :]
+
+            ########
+            ######## RANDOMIZE THE ORDER OF THE VALIDATION DATA
+            ########
+
+            valid_images = self.valid_images
+            valid_kspace = self.valid_kspace
+            valid_names_old = self.valid_names
+
+            valid_arange = np.arange(total_valid)
+            np.random.shuffle(valid_arange)
+
+            valid_names = np.array(valid_names_old)
+            valid_names = valid_names[valid_arange]
+            valid_names = list(valid_names)
+
+            self.valid_names = valid_names
+            self.valid_images = valid_images[valid_arange, :, :, :, :]
+            self.valid_kspace = valid_kspace[valid_arange, :, :, :, :]
+            
 
     def mask_kspace(self, full_kspace):
 
