@@ -72,7 +72,8 @@ class data_generator:
 
         study_dir = self.study_dir
         # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
+        #scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "2014_09_10_SINGH_COR_AF2/data/dataFile.mat")
 
         scan_name_list = []
 
@@ -163,24 +164,31 @@ class data_generator:
     def split_train_and_valid(self, images, kspace, names_list):
         print("\nSplitting Training And Valid Data . . . \n")
 
-        (total_images, num_channels, img_height, img_width) = images.shape
+        total_images = len(names_list) # assumption that names = total num
+        #(total_images, num_channels, img_height, img_width) = images.shape
+        num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
+        num_train = int(total_images - num_valid)
+        
+        total_arange = np.arange(total_images) # total_arange = indices
+        np.random.shuffle(total_arange)
+        total_arange = total_arange.astype(np.int16)
+        # Randomize the order of the data set
 
         if self.is_2d:
 
-            num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
-            num_train = int(total_images - num_valid)
-
-            total_arange = np.arange(total_images)
-            np.random.shuffle(total_arange)
-            total_arange = total_arange.astype(np.int16)
-            # Randomize the order of the data set
-
             # Dumb Fix for how to randomize the list of patient names
-            # TODO: Possible one liner here
+            names_list_new = np.array(names_list)
+            names_list_new = names_list_new[total_arange]
+            names_list_new = list(names_list_new)
+
+
             old_names_list = names_list
             names_list = []
             for counter in range(total_images):
                 names_list.append(old_names_list[total_arange[counter]])
+            
+            # TODO: Check if shuffled correctly
+            print("3 liner = 4 liner: " + str(names_list == names_list_new))
 
             images = images[total_arange, :, :, :]
             kspace = kspace[total_arange, :, :, :]
@@ -205,8 +213,7 @@ class data_generator:
         elif not self.is_2d:
             # same process, just need to extract one more variable from the images obj
             (_, _, _, _, num_slices) = images.shape
-            # TODO: set variables before shuffling and setting train/validate data
-            # Probably just move this elif statement to the beginning of this function
+
 
     def get_batch(self):
         print("\n Getting batch . . . \n")
