@@ -72,7 +72,7 @@ class data_generator:
 
         study_dir = self.study_dir
         # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "*/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
         #scan_files = glob.glob(study_dir + "2014_09_10_SINGH_COR_AF2/data/dataFile.mat")
 
         scan_name_list = []
