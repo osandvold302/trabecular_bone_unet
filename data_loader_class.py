@@ -281,6 +281,7 @@ class data_generator:
             # NOTE: CONVERT TO TENSORFLOW
             # TRAIN DATA
 
+            # BUG: This fails without error? train_images_tf referenced before defined in the return
             train_images_tf = tf.convert_to_tensor(
                 self.train_images, dtype=tf.complex128
             )
