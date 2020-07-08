@@ -409,7 +409,7 @@ class data_generator:
             
 
     def mask_kspace(self, full_kspace):
-        num_scans, num_channels, img_height, img_width = 0
+        num_scans=num_channels=img_height=img_width = 0
 
         acceleration_factor = self.acceleration_factor
         polynomial_order = self.polynomial_order
