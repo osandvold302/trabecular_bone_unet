@@ -433,6 +433,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
+            print("gen_pdf size: " + str(pdf.shape))
             (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
             
             print("gen_sample_mask size: " + str(sub_mask.shape))
