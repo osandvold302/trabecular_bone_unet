@@ -428,13 +428,14 @@ class data_generator:
 
         for counter in range(num_scans):
             (pdf, offset_value) = gen_pdf(
-                img_size=(1, img_width),
+                # NOTE: This might fail for non square images
+                img_size=(1 if self.is_2d else img_height, img_width),
                 poly_order=polynomial_order,
                 usf=undersampling_factor,
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=1, sample_tol=0.5)
             
             mask_2d = sub_mask
 
@@ -449,7 +450,6 @@ class data_generator:
             mask_3d[counter, 0, :, :] = mask_2d
 
             if self.is_2d:
-                print(mask_2d.shape)
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
