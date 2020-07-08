@@ -258,7 +258,7 @@ class data_generator:
     def get_batch_tf(self):
         print("\n Getting TENSORFLOW batch . . . \n")
 
-        if self.is_2d:
+        if self.is_2d or not self.is_2d:
 
             # Images and Kspace matrices are of the order
             # Height, Width, Scan_slice
@@ -424,7 +424,7 @@ class data_generator:
         undersampling_factor = 1.0 / acceleration_factor
 
         undersampled_kspace = np.zeros(full_kspace.shape, dtype=np.cdouble)
-        mask_3d = np.zeros(full_kspace.shape, dtype=np.bool)
+        mask_3d = np.zeros((num_scans, num_channels, img_height, img_width), dtype=np.bool)
 
         for counter in range(num_scans):
             (pdf, offset_value) = gen_pdf(
@@ -434,10 +434,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            print("gen_pdf size: " + str(pdf.shape))
             (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
-            
-            print("gen_sample_mask size: " + str(sub_mask.shape))
             
             mask_2d = sub_mask
 
@@ -452,10 +449,12 @@ class data_generator:
             mask_3d[counter, 0, :, :] = mask_2d
 
             if self.is_2d:
+                print(mask_2d.shape)
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
-                undersampled_sample = np.multiply(full_kspace[counter, 0, :, :, :], mask_2d)
+                print(mask_2d.shape)
+                undersampled_sample = np.multiply(mask_2d, full_kspace[counter, 0, :, :, :])
                 undersampled_kspace[counter, 0, :, :, :] = undersampled_sample
 
         return undersampled_kspace, mask_3d
