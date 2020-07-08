@@ -408,20 +408,18 @@ class data_generator:
             
 
     def mask_kspace(self, full_kspace):
+        num_scans, num_channels, img_height, img_width = 0
 
         acceleration_factor = self.acceleration_factor
         polynomial_order = self.polynomial_order
         distance_penalty = self.distance_penalty
         center_maintained = self.center_maintained
 
-        # NOTE: Need to think of a way to optimize this for 3D slices?
-        # Current implementation loops over all single center slice images and
-        # adds the optimal undersampled kspace pdf to dataset
+        if self.is_2d:
+            (num_scans, num_channels, img_height, img_width) = full_kspace.shape
+        else:
+            (num_scans, num_channels, img_height, img_width, num_slices) = full_kspace.shape
 
-        # For 3D we want to generate TWO undersampled kspace "images"
-        # Can we assume the optimal horizontal and 3rd dim pdf combined are optimal?
-
-        (num_scans, num_channels, img_height, img_width) = full_kspace.shape
         undersampling_factor = 1.0 / acceleration_factor
 
         undersampled_kspace = np.zeros(full_kspace.shape, dtype=np.cdouble)
@@ -435,19 +433,28 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (mask_1d, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
+            
+            print("gen_sample_mask size: " + str(sub_mask.shape))
+            
+            mask_2d = sub_mask
 
-            mask_2d = np.matlib.repmat(mask_1d, img_height, 1).astype(np.cdouble)
             # Take the horiztonal 1D kspace psueorandom mask and replicate it down vertically
             # To create the actual 2D kspace mask that will be used for the data
             #       NOTE: Replicated vertically since we have no penalty in the readout direction
             #       so we don't subsample in readout
+            if self.is_2d:
+                mask_1d = sub_mask
+                mask_2d = np.matlib.repmat(mask_1d, img_height, 1).astype(np.cdouble)
 
             mask_3d[counter, 0, :, :] = mask_2d
 
-            # undersampled_slice=np.multiply(mask,full_kspace[:,:,counter])
-            undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
-            undersampled_kspace[counter, 0, :, :] = undersampled_slice
+            if self.is_2d:
+                undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
+                undersampled_kspace[counter, 0, :, :] = undersampled_slice
+            else:
+                undersampled_sample = np.multiply(full_kspace[counter, 0, :, :, :], mask_2d)
+                undersampled_kspace[counter, 0, :, :, :] = undersampled_sample
 
         return undersampled_kspace, mask_3d
 
