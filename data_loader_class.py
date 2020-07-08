@@ -435,7 +435,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=1, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=120, sample_tol=0.5)
             
             mask_2d = sub_mask
 
@@ -453,9 +453,9 @@ class data_generator:
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
-                print(mask_2d.shape)
-                undersampled_sample = np.multiply(mask_2d, full_kspace[counter, 0, :, :, :])
-                undersampled_kspace[counter, 0, :, :, :] = undersampled_sample
+                # (60, 512, 512)x(512,512) = (60, 512, 512)?
+                undersampled_sample = np.multiply(np.reshape(full_kspace[counter, 0, :, :, :], (num_slices, img_height, img_width)), mask_2d)
+                undersampled_kspace[counter, 0, :, :, :] = np.reshape(undersampled_sample, (img_height, img_width, num_slices))
 
         return undersampled_kspace, mask_3d
 
