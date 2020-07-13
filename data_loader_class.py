@@ -39,7 +39,8 @@ from create_kspace_mask import gen_pdf, gen_sampling_mask, view_mask_and_pdfs
 class data_generator:
     def __init__(
         self,
-        study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/",
+        #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
+        study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
@@ -72,17 +73,25 @@ class data_generator:
 
         study_dir = self.study_dir
         # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
-        #scan_files = glob.glob(study_dir + "2014_09_10_SINGH_COR_AF2/data/dataFile.mat")
+        #scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
+        
+        # Used for cluster
+        scan_files = glob.glob(study_dir + "*dataFile.mat")
 
         scan_name_list = []
 
         # Save the Patient ID to a list of the same order as the data will be loaded
         for counter in range(len(scan_files)):
+            '''Used on LSNI
             (_, split_drive) = os.path.splitdrive(scan_files[counter])
             (data_folder, _) = os.path.split(split_drive)
             (scan_folder, _) = os.path.split(data_folder)
             (_, scan_name) = os.path.split(scan_folder)
+            '''
+            # Used for the cluster
+            fileName = os.path.basename(scan_files[counter])
+            scan_name = fileName.split('_')[0]
+            # TODO: Create flag for switching between
             scan_name_list.append(scan_name)
 
         num_scans = len(scan_files)
