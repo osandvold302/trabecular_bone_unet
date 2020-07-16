@@ -18,7 +18,7 @@ import argparse
 
 import tensorflow as tf
 import numpy as np
-from tensorflow.python.ops.signal.fft_ops import fft2d, ifft2d, fftshift, ifftshift
+from tensorflow.python.ops.signal.fft_ops import fft2d, ifft2d, fftshift, ifftshift, fft3d, ifft3d
 
 # from tensorflow.signal import fft2d, ifft2d, fftshift, ifftshift
 from tensorflow.compat.v1 import Session, placeholder
@@ -173,12 +173,21 @@ class CNN(tf.Module):
             valid_kspace_undersampled,
         ) = my_generator.get_batch_tf()
 
-        # NOTE: SINCE THIS IS 2D, TRAIN_IMAGES HAS THE FORM
-        #       (IMG_HEIGHT, IMG_WIDTH, BATCH_DIM)
+        # NOTE: 2D TRAIN_IMAGES HAS THE FORM
+        #       (BATCH_DIM, IMG_HEIGHT, IMG_WIDTH)
+        # 3D TRAIN_IMAGES IS (BATCH_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SCANS)
+        
+        num_train = num_channels = img_height = img_width = 0
 
-        (num_train, num_channels, img_height, img_width) = train_images.shape
+        if self.bool_2d:
 
-        input_shape = (None, num_channels, img_height, img_width)
+          (num_train, num_channels, img_height, img_width) = train_images.shape
+          input_shape = (None, num_channels, img_height, img_width)
+
+        else:
+          (num_train, num_channels, img_height, img_width, num_slices) = train_images.shape
+
+          input_shape = (None, num_channels, img_height, img_width, num_slices)
 
         model = simple_cnn(input_shape)
 
@@ -239,6 +248,7 @@ class CNN(tf.Module):
 
         #     print ('Epoch [%d/%d], Loss: %.4f, Time: %2fs'
         #             %(epoch+1, num_epochs, training_loss_value, elapsed))
+
     def image_to_kspace_tf(image):
         (num_scans, num_channels, img_height, img_width) = image.shape
         # NOTE: MIGHT HAVE TO CONVERT IMAGE TO COMPLEX DOUBLE HERE
@@ -246,12 +256,23 @@ class CNN(tf.Module):
 
         # (Null, batch_dim, channel_dim, height, width)
         # kspace = ifftshift( fft2d( fftshift( image )))
-
+        
+        # QUESTION: Why are we looping over the 2nd index?
         for counter in range(num_scans):
             kspace[:, counter, :, :, :] = ifftshift(
                 fft2d(fftshift(image[:, counter, :, :, :]))
             )
 
+        return kspace
+
+    def image_to_kspace_tf_3d(image):
+        (num_scans, num_channels, img_height, img_width, num_slices) = image.shape
+        kspace = tf.zeros(image.shape, dtype=tf.complex128)
+
+        for counter in range(num_scans):
+            kspace[:, counter, :, :, :, :] = ifftshift(
+                fft3d(fftshift(image[:, counter, :, :, :, :]))
+            )
         return kspace
 
     def kspace_to_image_tf(kspace):
@@ -269,6 +290,17 @@ class CNN(tf.Module):
         # image = tf.math.abs( image )
 
         return image
+
+    def kspace_to_image_tf_3d(kspace):
+        (num_scans, num_channels, img_height, img_width, num_slices) = kspace.shape
+        image = tf.zeros(kspace.shape, dtype=tf.complex128)
+
+        for counter in range(num_scans):
+            image[:, counter, :, :, :, :] = ifftshift(
+                fft3d(fftshift(kspace[:, counter, :, :, :, :]))
+            )
+        return image
+      
 
 
 
