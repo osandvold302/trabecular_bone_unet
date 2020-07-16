@@ -24,6 +24,7 @@ import numpy.matlib
 import os
 import tensorflow as tf
 import argparse
+import logging
 
 #############
 #############
@@ -35,6 +36,17 @@ import argparse
 from show_3d_images import show_3d_images
 from create_kspace_mask import gen_pdf, gen_sampling_mask, view_mask_and_pdfs
 
+def get_logger(name):
+    log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
+    logging.basicConfig(level=logging.DEBUG,format=log_format,
+                        filename='dev.log',
+                        filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(logging.Formatter(log_format))
+    logging.getLogger(name).addHandler(console)
+
+    return logging.getLogger(name)
 
 class data_generator:
     def __init__(
@@ -591,7 +603,7 @@ class data_generator:
 
         return pdf, check_point
 
-    def gen_sampling_mask(self, pdf, max_iter=150, sample_tol=0.5):
+    def gen_sampling_mask(self, pdf, max_iter=15, sample_tol=0.5):
         # pdf -> The simulated pdf from gen_pdf
         #       NOTE: THIS pdf is not normalized, i.e.
         #               integral_-inf^inf != 0
@@ -672,6 +684,8 @@ class data_generator:
 
 
 if __name__ == "__main__":
+    logger = get_logger('data_loader')
+    logger.info('Running data_loader')
 
     parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
     parser.add_argument('--2d', dest='run_2d', action='store_true')
@@ -689,6 +703,8 @@ if __name__ == "__main__":
         return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
     the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
+
+    logger.log('Data generator init complete')
 
     gen_tf = True
 
@@ -709,6 +725,8 @@ if __name__ == "__main__":
         print(train_images.shape)
         print(train_kspace.shape)
         print(train_kspace_undersampled.shape)
+        logger.log('Completed generating tensors')
+        logger.log('Shape of train_images: ' + str(train_images.shape))
 
     else:
         (
