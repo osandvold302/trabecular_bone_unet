@@ -11,18 +11,20 @@
 #### The below line determines how many CPUs
 #### your job will request. Only set it higher 
 #### if you need the additional memory
-#$ -pe smp 4
+####$ -pe smp 4
 ##
 #### If your job requires lots more memory,
 #### use one of the below options by removing
 #### the first two `#`
 ####$ -l mid_mem
 ####$ -l high_mem
+#$ -l gpu=1
+#$ -l h_vmem=32G
 ##
 #### The below option determines which queues 
 #### your job is submitted to. Multiple can be
 #### passed if separated by a comma
-####$ -q COE,all.q,BME4920 
+####$ -q all.q 
 ##
 #### The below option tells the compute node to 
 #### begin execution from the same directory as
@@ -35,13 +37,13 @@
 #### sure your log file is in the correct format
 #$ -j y
 #$ -o $JOB_NAME.log 
-#$ -ckpt user
+####$ -ckpt user
 ##################
 ## DON'T FORGET ##
 ##  TO SET THE  ## 
 ##   JOB NAME   ##
 ##################
-#$ -N extract_features
+#$ -N test_cnn_2d
 
 
 #### The below variables are a helpful way to
@@ -65,9 +67,9 @@ start=`date +%s`
 ## so they will be printed to the log ##
 ########################################
 CMD="
-python ~/bme_senior_design/python-scripts/extract_features.py --file ~/bme_senior_design/Data/typodont_mandible_rough_align.stl
+module load python/anaconda/3.5.6+tfgpu+pydicom+opencv
+python trabecular_bone_unet/main_BCJ.py
 "
-
 
 #### The below commands prints the text you
 #### assigned to the CMD variable to the log
@@ -80,10 +82,11 @@ echo "**************************************"
 ##  in the lines below this comment,  ##
 ##   so they are actually  executed   ##
 ########################################
-conda env create -f environment.yml
-conda activate bme_senior_design
-python ~/bme_senior_design/python-scripts/extract_features.py --file ~/bme_senior_design/Data/typodont_mandible_rough_align.stl
-
+CUDA_VISIBLE_DEVICES=`get_CUDA_VISIBLE_DEVICES` || exit
+export CUDA_VISIBLE_DEVICES
+nvidia-smi
+module load python/anaconda/3.5.6+tfgpu+pydicom+opencv
+python trabecular_bone_unet/main_BCJ.py
 
 
 #### The below commands print the date that your
