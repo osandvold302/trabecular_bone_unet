@@ -45,6 +45,7 @@ def get_logger(name):
     console.setLevel(logging.DEBUG)
     console.setFormatter(logging.Formatter(log_format))
     logging.getLogger(name).addHandler(console)
+    logging.basicConfig(filename='LOGFILE.log',filemode='w')
 
     return logging.getLogger(name)
 
@@ -474,7 +475,6 @@ class data_generator:
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
-                # (60, 512, 512)x(512,512) = (60, 512, 512)?
                 undersampled_sample = np.multiply(np.reshape(full_kspace[counter, 0, :, :, :], (num_slices, img_height, img_width)), mask_2d)
                 undersampled_kspace[counter, 0, :, :, :] = np.reshape(undersampled_sample, (img_height, img_width, num_slices))
 
@@ -590,7 +590,7 @@ class data_generator:
             num_sampled_pts = np.floor(pdf.sum())
 
             if num_sampled_pts == num_desired_pts:
-                # print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
+                print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
                 break
             if num_sampled_pts > num_desired_pts:  # Infeasible
                 max_offset = check_point
@@ -603,7 +603,7 @@ class data_generator:
 
         return pdf, check_point
 
-    def gen_sampling_mask(self, pdf, max_iter=15, sample_tol=0.5):
+    def gen_sampling_mask(self, pdf, max_iter=150, sample_tol=0.5):
         # pdf -> The simulated pdf from gen_pdf
         #       NOTE: THIS pdf is not normalized, i.e.
         #               integral_-inf^inf != 0
@@ -704,7 +704,7 @@ if __name__ == "__main__":
 
     the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
 
-    logger.log('Data generator init complete')
+    logger.info('Data generator init complete')
 
     gen_tf = True
 
@@ -725,8 +725,8 @@ if __name__ == "__main__":
         print(train_images.shape)
         print(train_kspace.shape)
         print(train_kspace_undersampled.shape)
-        logger.log('Completed generating tensors')
-        logger.log('Shape of train_images: ' + str(train_images.shape))
+        logger.info('Completed generating tensors')
+        logger.info('Shape of train_images: ' + str(train_images.shape))
 
     else:
         (
