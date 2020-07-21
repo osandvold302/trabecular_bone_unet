@@ -43,6 +43,7 @@ from show_3d_images import show_3d_images
 
 class CNN:
     # class CNN(tf.Module):
+    # TODO: Add is_2d bool val
     def __init__(
         self,
         project_folder,
@@ -95,6 +96,7 @@ class CNN:
         self.batch_size = batch_size
         self.model_name = model_name
 
+        # TODO: Simplify
         if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
             self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
 
@@ -119,12 +121,15 @@ class CNN:
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
+        # TODO: add is_2d
         self.my_gen = data_generator(
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
             poly_distance_order=polyfit_order,
         )
 
+        # DEBUG: Am I missing/have the wrong data generator file?
+        # Don't have get_info() function
         (
             self.num_train,
             self.num_valid,
@@ -144,7 +149,8 @@ class CNN:
         # Allow the GPU to use its maximum resources
         self.sess = tf.Session(config=config_options)
         # Define the Tensorflow Session
-
+        
+        # TODO: Following is all setup for 2d images
         if self.is_image_space:
 
             # ####
@@ -159,6 +165,9 @@ class CNN:
                 self.img_height,
                 self.img_width,
             )
+
+            # TODO
+            # elif is_2d == false: matrix_shape = (None, 1, 512, 512, 60)
 
         else:
 
@@ -177,6 +186,7 @@ class CNN:
             # )
 
             # NOTE: THIS IS FOR 2D MODEL
+            # TODO: if/elif
             self.input_matrix_shape = (None, 2, self.img_height, self.img_width)
 
         self.input_subsampled_placeholder = tf.placeholder(
@@ -480,6 +490,7 @@ class CNN:
 
         return predicted_label
 
+    # TODO: Both methods assume 2d matrix shapes
 
     def fftshift(self, x):
         """
@@ -537,6 +548,9 @@ class CNN:
         else:
             return roll(input=x, shift=shift, axis=[1, 2])
 
+    # TODO: not sure how to update with 3d volume?
+    # Assumes 2d matrices
+
     def kspace_to_image(self, kspace):
 
         # NOTE: SO THE INPUT KSPACE MATRIX IS OF SIZE
@@ -564,7 +578,7 @@ class CNN:
 
         kspace = tf.to_complex64(image)
         kspace = self.ifftshift(kspace)
-        kspace = fft2d(kspace)
+        kspace = fft2d(kspace) # --> cannot use with tf v1.12
         kspace = self.fftshift(kspace)
         return kspace
 
@@ -654,6 +668,9 @@ class CNN:
         #     [-1,-2,-1],
         #     [0,0,0],
         #     [1,2,1]])
+
+        # TODO: add dz filter for 3d volume?
+        # where is this dy derived from?
 
         dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
 
