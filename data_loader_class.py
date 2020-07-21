@@ -23,6 +23,8 @@ import numpy.fft as fft
 import numpy.matlib
 import os
 import tensorflow as tf
+import argparse
+import logging
 
 #############
 #############
@@ -34,15 +36,28 @@ import tensorflow as tf
 from show_3d_images import show_3d_images
 from create_kspace_mask import gen_pdf, gen_sampling_mask, view_mask_and_pdfs
 
+def get_logger(name):
+    log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
+    logging.basicConfig(level=logging.DEBUG,format=log_format,
+                        filename='dev.log',
+                        filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(logging.Formatter(log_format))
+    logging.getLogger(name).addHandler(console)
+    logging.basicConfig(filename='LOGFILE.log',filemode='w')
+
+    return logging.getLogger(name)
 
 class data_generator:
     def __init__(
         self,
-        study_dir="E:\\SPGR_AF2_242_242_1500_um\\",
+        #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
+        study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
         acceleration_factor=4,
         batch_size=10,
-        bool_2d=True, # TODO: Needs to be set via command line argument
+        bool_2d=True,
         poly_distance_order=4,  # Polynomial fit for L1/L2 distance matrix
         distance_penalty=2,  # L1 or L2. But it must be L1 for 2D case iirc
         center_maintained=0,  # Percent of center of kspace that must be sampled
@@ -62,35 +77,45 @@ class data_generator:
         self.distance_penalty = distance_penalty
         self.center_maintained = center_maintained
 
-        if self.is_2d:
-
-            (images_full, kspace_full, patient_names) = self.load_data()
-
-            self.split_train_and_valid(images_full, kspace_full, patient_names)
+        # Will have dimensions (94, 1, 512, 512) or (94, 1, 512, 512, 60) depending on 2d/3d
+        (images_full, kspace_full, patient_names) = self.load_data()
+        self.split_train_and_valid(images_full, kspace_full, patient_names)
 
     def load_data(self):
         # print("\nLoading images and kspace . . . \n")
 
         study_dir = self.study_dir
-        scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
+        # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
+        # scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
+        
+        # Used for cluster
+        scan_files = glob.glob(study_dir + "12*dataFile.mat")
 
         scan_name_list = []
 
         # Save the Patient ID to a list of the same order as the data will be loaded
         for counter in range(len(scan_files)):
+            '''Used on LSNI
             (_, split_drive) = os.path.splitdrive(scan_files[counter])
             (data_folder, _) = os.path.split(split_drive)
             (scan_folder, _) = os.path.split(data_folder)
             (_, scan_name) = os.path.split(scan_folder)
+            '''
+            # Used for the cluster
+            fileName = os.path.basename(scan_files[counter])
+            scan_name = fileName.split('_')[0]
+            # TODO: Create flag for switching between
             scan_name_list.append(scan_name)
 
         num_scans = len(scan_files)
+        print("num scans:" + str(num_scans))
 
         for counter in range(num_scans):
 
             img = loadmat(scan_files[counter])
 
-            img = img["img"]
+            # img = img["img"]
+            img = img["D"] # NOTE: matfile has "D" key not "img"
 
             if self.standardize_data:
                 img_mean = img.mean()
@@ -117,17 +142,26 @@ class data_generator:
                     )
 
                 else:
-                    # TODO: add dim for # z slices
-                    # NUM_SCANS = total in dataset? Confer with Brandon
-                    raise ValueError("HAVENT PROGRAMMED 3D")
+                    # NOTE: OUTPUT HAS SHAPE
+                    # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
+                    # (NUM_SCANS, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
+                    # (94, 1, 512, 512, 60)
+
+                    img_stack = np.zeros(
+                        (num_scans, 1, img_height, img_width, num_slices), dtype=np.double
+                    )
+                    kspace_stack = np.zeros(
+                        (num_scans, 1, img_height, img_width, num_slices), dtype=np.cdouble
+                    )
+
 
             if self.is_2d:
                 img_stack[counter, 0, :, :] = img[:, :, 29]
                 kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
-                # TODO: Need to grab all images, not just center slice
-                # TOTAL SIZE OF SCAN: (height, width, 57?)
-                raise ValueError("Haven't coded 3D section yet!!!!!!")
+                # TODO: Check img_to_kspace can handle 3d volumes
+                img_stack[counter, 0, :, :, :] = img
+                kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
 
         '''
         Standarization completed in earlier section for 2D--remove commented out code?
@@ -152,24 +186,20 @@ class data_generator:
     def split_train_and_valid(self, images, kspace, names_list):
         print("\nSplitting Training And Valid Data . . . \n")
 
+        total_images = len(names_list) # assumption that names = total num
+        num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
+        num_train = int(total_images - num_valid)
+        
+        total_arange = np.arange(total_images) # total_arange = indices
+        np.random.shuffle(total_arange)
+        total_arange = total_arange.astype(np.int16)
+        # Randomize the order of the data set
+
+        names_list = np.array(names_list)
+        names_list = names_list[total_arange]
+        names_list = list(names_list)
+
         if self.is_2d:
-
-            (total_images, num_channels, img_height, img_width) = images.shape
-
-            num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
-            num_train = int(total_images - num_valid)
-
-            total_arange = np.arange(total_images)
-            np.random.shuffle(total_arange)
-            total_arange = total_arange.astype(np.int16)
-            # Randomize the order of the data set
-
-            # Dumb Fix for how to randomize the list of patient names
-            # TODO: Possible one liner here
-            old_names_list = names_list
-            names_list = []
-            for counter in range(total_images):
-                names_list.append(old_names_list[total_arange[counter]])
 
             images = images[total_arange, :, :, :]
             kspace = kspace[total_arange, :, :, :]
@@ -191,11 +221,27 @@ class data_generator:
             self.valid_images = valid_images
             self.valid_kspace = valid_kspace
 
-        elif not self.is_2d:
-            # same process, just need to extract one more variable from the images obj
-            (total_images, num_slices, num_channels, img_height, img_width) = images.shape
-            # TODO: set variables before shuffling and setting train/validate data
-            # Probably just move this elif statement to the beginning of this function
+        else:
+            images = images[total_arange, :, :, :, :]
+            kspace = kspace[total_arange, :, :, :, :]
+
+            # Now split into training and validation data
+            train_names = names_list[:num_train]
+            train_images = images[:num_train, :, :, :, :]
+            train_kspace = kspace[:num_train, :, :, :, :]
+
+            valid_names = names_list[num_train + 1 :]
+            valid_images = images[num_train + 1 :, :, :, :, :]
+            valid_kspace = kspace[num_train + 1 :, :, :, :, :]
+
+            self.train_names = train_names
+            self.train_images = train_images
+            self.train_kspace = train_kspace
+
+            self.valid_names = valid_names
+            self.valid_images = valid_images
+            self.valid_kspace = valid_kspace
+
 
     def get_batch(self):
         print("\n Getting batch . . . \n")
@@ -234,7 +280,7 @@ class data_generator:
     def get_batch_tf(self):
         print("\n Getting TENSORFLOW batch . . . \n")
 
-        if self.is_2d:
+        if self.is_2d or not self.is_2d:
 
             # Images and Kspace matrices are of the order
             # Height, Width, Scan_slice
@@ -257,6 +303,7 @@ class data_generator:
             # NOTE: CONVERT TO TENSORFLOW
             # TRAIN DATA
 
+            # BUG: This fails without error? train_images_tf referenced before defined in the return
             train_images_tf = tf.convert_to_tensor(
                 self.train_images, dtype=tf.complex128
             )
@@ -312,10 +359,10 @@ class data_generator:
 
             train_arange = np.arange(total_train)
             np.random.shuffle(train_arange)
-
-            train_names = []
-            for counter in range(total_train):
-                train_names.append(train_names_old[train_arange[counter]])
+            
+            train_names = np.array(train_names_old)
+            train_names = train_names[train_arange]
+            train_names = list(train_names)
 
             self.train_names = train_names
             self.train_images = train_images[train_arange, :, :, :]
@@ -332,56 +379,104 @@ class data_generator:
             valid_arange = np.arange(total_valid)
             np.random.shuffle(valid_arange)
 
-            valid_names = []
-
-            for counter in range(total_valid):
-                train_names.append(valid_names_old[valid_arange[counter]])
+            valid_names = np.array(valid_names_old)
+            valid_names = valid_names[valid_arange]
+            valid_names = list(valid_names)
 
             self.valid_names = valid_names
             self.valid_images = valid_images[valid_arange, :, :, :]
             self.valid_kspace = valid_kspace[valid_arange, :, :, :]
 
+        else:
+            (total_train, num_channels, img_height, img_width, num_slices) = self.train_images.shape
+            (total_valid, num_channels, img_height, img_width, num_slices) = self.valid_images.shape
+
+            ########
+            ######## RANDOMIZE THE ORDER OF THE TRAIN DATA
+            ########
+
+            train_images = self.train_images
+            train_kspace = self.train_kspace
+            train_names_old = self.train_names
+
+            train_arange = np.arange(total_train)
+            np.random.shuffle(train_arange)
+            
+            train_names = np.array(train_names_old)
+            train_names = train_names[train_arange]
+            train_names = list(train_names)
+
+            self.train_names = train_names
+            self.train_images = train_images[train_arange, :, :, :, :]
+            self.train_kspace = train_kspace[train_arange, :, :, :, :]
+
+            ########
+            ######## RANDOMIZE THE ORDER OF THE VALIDATION DATA
+            ########
+
+            valid_images = self.valid_images
+            valid_kspace = self.valid_kspace
+            valid_names_old = self.valid_names
+
+            valid_arange = np.arange(total_valid)
+            np.random.shuffle(valid_arange)
+
+            valid_names = np.array(valid_names_old)
+            valid_names = valid_names[valid_arange]
+            valid_names = list(valid_names)
+
+            self.valid_names = valid_names
+            self.valid_images = valid_images[valid_arange, :, :, :, :]
+            self.valid_kspace = valid_kspace[valid_arange, :, :, :, :]
+            
+
     def mask_kspace(self, full_kspace):
+        num_scans=num_channels=img_height=img_width = 0
 
         acceleration_factor = self.acceleration_factor
         polynomial_order = self.polynomial_order
         distance_penalty = self.distance_penalty
         center_maintained = self.center_maintained
 
-        # NOTE: Need to think of a way to optimize this for 3D slices?
-        # Current implementation loops over all single center slice images and
-        # adds the optimal undersampled kspace pdf to dataset
+        if self.is_2d:
+            (num_scans, num_channels, img_height, img_width) = full_kspace.shape
+        else:
+            (num_scans, num_channels, img_height, img_width, num_slices) = full_kspace.shape
 
-        # For 3D we want to generate TWO undersampled kspace "images"
-        # Can we assume the optimal horizontal and 3rd dim pdf combined are optimal?
-
-        (num_slices, num_channels, img_height, img_width) = full_kspace.shape
         undersampling_factor = 1.0 / acceleration_factor
 
         undersampled_kspace = np.zeros(full_kspace.shape, dtype=np.cdouble)
-        mask_3d = np.zeros(full_kspace.shape, dtype=np.bool)
+        mask_3d = np.zeros((num_scans, num_channels, img_height, img_width), dtype=np.bool)
 
-        for counter in range(num_slices):
+        for counter in range(num_scans):
             (pdf, offset_value) = gen_pdf(
-                img_size=(1, img_width),
+                # NOTE: This might fail for non square images
+                img_size=(1 if self.is_2d else img_height, img_width),
                 poly_order=polynomial_order,
                 usf=undersampling_factor,
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (mask_1d, sf) = gen_sampling_mask(pdf, max_iter=150, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=120, sample_tol=0.5)
+            
+            mask_2d = sub_mask
 
-            mask_2d = np.matlib.repmat(mask_1d, img_height, 1).astype(np.cdouble)
             # Take the horiztonal 1D kspace psueorandom mask and replicate it down vertically
             # To create the actual 2D kspace mask that will be used for the data
             #       NOTE: Replicated vertically since we have no penalty in the readout direction
             #       so we don't subsample in readout
+            if self.is_2d:
+                mask_1d = sub_mask
+                mask_2d = np.matlib.repmat(mask_1d, img_height, 1).astype(np.cdouble)
 
             mask_3d[counter, 0, :, :] = mask_2d
 
-            # undersampled_slice=np.multiply(mask,full_kspace[:,:,counter])
-            undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
-            undersampled_kspace[counter, 0, :, :] = undersampled_slice
+            if self.is_2d:
+                undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
+                undersampled_kspace[counter, 0, :, :] = undersampled_slice
+            else:
+                undersampled_sample = np.multiply(np.reshape(full_kspace[counter, 0, :, :, :], (num_slices, img_height, img_width)), mask_2d)
+                undersampled_kspace[counter, 0, :, :, :] = np.reshape(undersampled_sample, (img_height, img_width, num_slices))
 
         return undersampled_kspace, mask_3d
 
@@ -495,7 +590,7 @@ class data_generator:
             num_sampled_pts = np.floor(pdf.sum())
 
             if num_sampled_pts == num_desired_pts:
-                # print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
+                print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
                 break
             if num_sampled_pts > num_desired_pts:  # Infeasible
                 max_offset = check_point
@@ -589,8 +684,17 @@ class data_generator:
 
 
 if __name__ == "__main__":
+    logger = get_logger('data_loader')
+    logger.info('Running data_loader')
 
-    # TODO: Add command line option to run 3D processing
+    parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
+    parser.add_argument('--2d', dest='run_2d', action='store_true')
+    parser.add_argument('--3d', dest='run_2d', action='store_false')
+    parser.set_defaults(run_2d=True)
+
+    args = parser.parse_args()
+
+    run_2d = args.run_2d
 
     def img_to_kspace(img):
         return fft.ifftshift(fft.fftn(fft.fftshift(img)))
@@ -598,8 +702,9 @@ if __name__ == "__main__":
     def kspace_to_img(kspace):
         return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
-    the_generator = data_generator()  # Default parameters go in here
-    print('aaaa')
+    the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
+
+    logger.info('Data generator init complete')
 
     gen_tf = True
 
@@ -620,6 +725,8 @@ if __name__ == "__main__":
         print(train_images.shape)
         print(train_kspace.shape)
         print(train_kspace_undersampled.shape)
+        logger.info('Completed generating tensors')
+        logger.info('Shape of train_images: ' + str(train_images.shape))
 
     else:
         (
@@ -653,11 +760,11 @@ if __name__ == "__main__":
         # print(train_images.shape)
         # print(train_kspace.shape)
 
-        (img_height, img_width, num_slices) = train_images.shape
+        (img_height, img_width, num_scans) = train_images.shape
 
         train_downsampled_img = np.zeros(train_images.shape)
 
-        for cc in range(num_slices):
+        for cc in range(num_scans):
             train_downsampled_img[:, :, cc] = kspace_to_img(
                 train_kspace_undersampled[:, :, cc]
             )
