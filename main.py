@@ -562,6 +562,9 @@ class CNN:
         # kspace_real = kspace[:,0,:,:]
         # kspace_imag = kspace[:,1,:,:]
 
+        # NOTE: tensorflow does NOT want you to split tensors
+        # in order to perform our backprop, we need to split the complex
+        # and real components
         kspace_real = Lambda(lambda y_true: kspace[:, 0, :, :])(kspace)
         kspace_imag = Lambda(lambda y_true: kspace[:, 1, :, :])(kspace)
 
@@ -625,7 +628,8 @@ class CNN:
 
         kspace_true = self.image_to_kspace(image=y_true)
         kspace_pred = self.image_to_kspace(image=y_pred)
-
+        
+        # I should be able to use this below
         # kspace_loss = tf.losses.mean_squared_error()
 
         kspace_loss = tf.abs(tf.subtract(kspace_true, kspace_pred))
