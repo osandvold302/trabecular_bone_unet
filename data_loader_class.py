@@ -55,31 +55,36 @@ class data_generator:
         #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
         study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
-        acceleration_factor=4,
         batch_size=10,
+        acceleration_factor=2,
         bool_2d=True,
         poly_distance_order=4,  # Polynomial fit for L1/L2 distance matrix
         distance_penalty=2,  # L1 or L2. But it must be L1 for 2D case iirc
         center_maintained=0,  # Percent of center of kspace that must be sampled
         # If 0.1, center 10% is ALWAYS sampled
+        bool_shuffle=True,
+        create_new_dataset=False,
     ):
 
         super(data_generator, self).__init__()
 
-        self.standardize_data = False
+        # self.standardize_data = True
+        self.standardize_data = True
 
-        self.study_dir = study_dir
         self.valid_ratio = valid_ratio
         self.acceleration_factor = acceleration_factor
-        self.batch_size = 10
+        self.batch_size = batch_size
         self.is_2d = bool_2d
         self.polynomial_order = poly_distance_order
         self.distance_penalty = distance_penalty
         self.center_maintained = center_maintained
+        self.data_type = tf.complex64
+        self.bool_shuffle = bool_shuffle
 
         # Will have dimensions (94, 1, 512, 512) or (94, 1, 512, 512, 60) depending on 2d/3d
         (images_full, kspace_full, patient_names) = self.load_data()
         self.split_train_and_valid(images_full, kspace_full, patient_names)
+
 
     def load_data(self):
         # print("\nLoading images and kspace . . . \n")
@@ -117,15 +122,6 @@ class data_generator:
             # img = img["img"]
             img = img["D"] # NOTE: matfile has "D" key not "img"
 
-            if self.standardize_data:
-                img_mean = img.mean()
-                img_std = img.std()
-                img = (img - img_mean) / img_std
-                img_min = np.amin(img)
-                img = img - img_min
-                # Probably better to define single constant offset value for
-                # entire dataset
-
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
                 if self.is_2d:
@@ -156,30 +152,20 @@ class data_generator:
 
 
             if self.is_2d:
-                img_stack[counter, 0, :, :] = img[:, :, 29]
-                kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
+                if self.standardize_data:
+                    tmp_img = img[:, :, 29]
+                    tmp_img = tmp_img - np.amin(tmp_img)
+                    tmp_img = tmp_img / np.amax(tmp_img)
+                    img_stack[counter, 0, :, :] = tmp_img
+                    kspace_stack[counter, 0, :, :] = self.img_to_kspace(tmp_img)
+
+                else:
+                    img_stack[counter, 0, :, :] = img[:, :, 29]
+                    kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
                 # TODO: Check img_to_kspace can handle 3d volumes
                 img_stack[counter, 0, :, :, :] = img
                 kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
-
-        '''
-        Standarization completed in earlier section for 2D--remove commented out code?
-        '''
-        # self.image_mean = img_stack.mean()
-        # self.image_std = img_stack.std()
-
-        # if self.standardize_data:
-
-        #     img_stack = (img_stack - self.image_mean)/self.image_std
-
-        # for counter in range(num_scans):
-        #     tmp_img = img_stack[:, :, counter]
-        #     tmp_mean = tmp_img.mean()
-        #     tmp_std = tmp_img.std()
-        #     tmp_img = (tmp_img-tmp_mean)/tmp_std
-        #     img_stack[:,:,counter]=tmp_img
-        #     kspace_stack[:, :, counter] = self.img_to_kspace(img_stack[:, :, counter])
 
         return img_stack, kspace_stack, scan_name_list
 
@@ -248,102 +234,156 @@ class data_generator:
 
         if self.is_2d:
 
+            (num_train, num_channels, img_height, img_width) = self.train_kspace.shape
+            (num_valid, _, _, _) = self.valid_kspace.shape
+
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
+
+    def generator(
+        self, batch_ind, is_train=True, is_image_space=True, return_masks=True
+    ):
+
+        if batch_ind == 0 and self.bool_shuffle:
+            # print('SHUFFLING \n\n')
+            self.shuffle_data()
+
+        if is_train:
+            kspace_matrix = self.train_kspace
+        else:
+            kspace_matrix = self.valid_kspace
+
+        if self.is_2d:
+
+            # NOTE: IMGAES ARE SAVED AS
+            #  (NUM_TRAIN, NUM_CHANNELS, IMG_HEIGHT, IMG_WIDTH )
+
+            (total_images, channel_dim, height_dim, width_dim) = kspace_matrix.shape
+
+            steps_per_epoch = int(np.ceil(total_images / self.batch_size))
+
+            # for counter in range(steps_per_epoch):
             # Images and Kspace matrices are of the order
             # Height, Width, Scan_slice
             # Readout, Phase Encoding, Center Slice of scan
 
-            self.shuffle_data()
+            start_ind = batch_ind * self.batch_size
+            end_ind = start_ind + self.batch_size
 
-            batch_size = self.batch_size
+            if end_ind > total_images:
+                end_ind = total_images
+                start_ind = total_images - self.batch_size
 
-            (train_kspace_undersampled, train_kspace_mask) = self.mask_kspace(
-                full_kspace=self.train_kspace
-            )
-
-            (valid_kspace_undersampled, valid_kspace_mask) = self.mask_kspace(
-                full_kspace=self.valid_kspace
-            )
-
-        return (
-            self.train_images,
-            self.train_kspace,
-            self.train_names,
-            train_kspace_undersampled,
-            train_kspace_mask,
-            self.valid_images,
-            self.valid_kspace,
-            self.valid_names,
-            valid_kspace_undersampled,
-            valid_kspace_mask,
-        )
-
-    def get_batch_tf(self):
-        print("\n Getting TENSORFLOW batch . . . \n")
-
-        if self.is_2d or not self.is_2d:
-
-            # Images and Kspace matrices are of the order
-            # Height, Width, Scan_slice
-            # Readout, Phase Encoding, Center Slice of scan
-
-            self.shuffle_data()
-
-            batch_size = self.batch_size
+            kspace_batch_full = kspace_matrix[start_ind:end_ind, :, :, :]
 
             # NOTE: GENERATE THE SUBSAMPLED TRAIN DATA
-            (train_kspace_undersampled, train_kspace_mask) = self.mask_kspace(
-                full_kspace=self.train_kspace
+            (kspace_batch_subsampled, kspace_batch_mask) = self.mask_kspace(
+                full_kspace=kspace_batch_full, is_image_space=is_image_space
             )
 
-            # NOTE: GENERATE THE SUBSAMPLED VALIDATION DATA
-            (valid_kspace_undersampled, valid_kspace_mask) = self.mask_kspace(
-                full_kspace=self.valid_kspace
-            )
+            (batch_dim, channel_dim, height_dim, width_dim) = kspace_batch_full.shape
 
-            # NOTE: CONVERT TO TENSORFLOW
-            # TRAIN DATA
+            if is_image_space:
+                ####
+                ####    IMAGE DOMAIN
+                ####
 
-            # BUG: This fails without error? train_images_tf referenced before defined in the return
-            train_images_tf = tf.convert_to_tensor(
-                self.train_images, dtype=tf.complex128
-            )
+                image_fullysampled_label = np.zeros(
+                   self.train_images.shape 
+                )
 
-            train_kspace_tf = tf.convert_to_tensor(
-                self.train_kspace, dtype=tf.complex128
-            )
+                image_subsampled_input = np.zeros(
+                   self.train_images.shape 
+                )
 
-            train_kspace_undersampled_tf = tf.convert_to_tensor(
-                train_kspace_undersampled, dtype=tf.complex128
-            )
+                for counter in range(batch_dim):
+                    image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
+                        kspace_batch_full[counter, 0, :, :]
+                    )
+                    image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
+                        kspace_batch_subsampled[counter, 0, :, :]
+                    )
 
-            # NOTE: CONVERT TO TENSORFLOW
-            # VALID DATA
+                if return_masks:
+                    return (
+                        image_subsampled_input,
+                        image_fullysampled_label,
+                        kspace_batch_mask,
+                    )
+                else:
+                    return image_subsampled_input, image_fullysampled_label
 
-            valid_images_tf = tf.convert_to_tensor(
-                self.valid_images, dtype=tf.complex128
-            )
+            else:
+                ####
+                ####    KSPACE DOMAIN
+                ####
 
-            valid_kspace_tf = tf.convert_to_tensor(
-                self.valid_kspace, dtype=tf.complex128
-            )
+                # IMAGES ARE SAVED AS
 
-            valid_kspace_undersampled_tf = tf.convert_to_tensor(
-                valid_kspace_undersampled, dtype=tf.complex128
-            )
+                # kspace_batch_subsampled and kspace_batch_full are of the size
+                #   (batch_size,n_channels,img_height,img_width)
+                #   (batch,1,height,width)
+                #       because they are still complex numbers
+                kspace_batch_subsampled_real = np.squeeze(
+                    np.real(kspace_batch_subsampled)
+                )
+                # kspace_batch_subsampled_real = (kspace_batch_subsampled_real-self.kspace_mean[0])/self.kspace_std[1]
 
-        return (
-            train_images_tf,
-            train_kspace_tf,
-            self.train_names,
-            train_kspace_undersampled,
-            valid_images_tf,
-            valid_kspace_tf,
-            self.valid_names,
-            valid_kspace_undersampled,
-        )
+                kspace_batch_subsampled_imag = np.squeeze(
+                    np.imag(kspace_batch_subsampled)
+                )
+                # kspace_batch_subsampled_real = (kspace_batch_subsampled_real-self.kspace_mean[1])/self.kspace_std[1]
+
+                kspace_batch_fullysampled_real = np.squeeze(np.real(kspace_batch_full))
+
+                kspace_batch_fullysampled_imag = np.squeeze(np.imag(kspace_batch_full))
+                kspace_subsampled_input = np.zeros(
+                    (batch_dim, 2, height_dim, width_dim)
+                )
+                kspace_fullysampled_label = np.zeros(
+                    (batch_dim, 2, height_dim, width_dim)
+                )
+
+                kspace_subsampled_input[:, 0, :, :] = kspace_batch_subsampled_real
+                kspace_subsampled_input[:, 1, :, :] = kspace_batch_subsampled_imag
+
+                kspace_fullysampled_label[:, 0, :, :] = kspace_batch_fullysampled_real
+                kspace_fullysampled_label[:, 1, :, :] = kspace_batch_fullysampled_imag
+
+                # print('SHAPES OF OUTPUTS \n\n\n')
+                # print(kspace_fullysampled_label.shape)
+                # print(kspace_subsampled_input.shape)
+                # print(aa)
+
+                tmp = kspace_batch_mask
+                kspace_batch_mask = np.zeros((batch_dim, 2, height_dim, width_dim))
+                kspace_batch_mask[:, 0, :, :] = np.squeeze(tmp)
+                kspace_batch_mask[:, 1, :, :] = np.squeeze(tmp)
+                kspace_batch_mask = 1 - kspace_batch_mask
+
+                # kspace_batch_mask = np.logical_not(kspace_batch_mask).astype(np.float32)
+
+                if return_masks:
+                    return (
+                        kspace_subsampled_input,
+                        kspace_fullysampled_label,
+                        kspace_batch_mask,
+                    )
+                else:
+                    return kspace_subsampled_input, kspace_fullysampled_label
+
 
     def shuffle_data(self):
-        print("\n Shuffling data . . . \n")
+        # print("\n Shuffling data . . . \n")
 
         if self.is_2d:
             (total_train, num_channels, img_height, img_width) = self.train_images.shape
@@ -389,7 +429,6 @@ class data_generator:
 
         else:
             (total_train, num_channels, img_height, img_width, num_slices) = self.train_images.shape
-            (total_valid, num_channels, img_height, img_width, num_slices) = self.valid_images.shape
 
             ########
             ######## RANDOMIZE THE ORDER OF THE TRAIN DATA
@@ -599,8 +638,6 @@ class data_generator:
 
             iter_num += 1
 
-        # TODO: 3D implementation for anisotropic volumes    
-
         return pdf, check_point
 
     def gen_sampling_mask(self, pdf, max_iter=150, sample_tol=0.5):
@@ -643,6 +680,7 @@ class data_generator:
                 candidate_mask = np.random.uniform(
                     low=0.0, high=1.0, size=total_elements
                 )
+
                 candidate_mask = candidate_mask.reshape((img_height, img_width))
                 # Uniformly sample points between 0 and 1
                 # in a matrix of the same size as the image
@@ -680,7 +718,7 @@ class data_generator:
         return fft.ifftshift(fft.fftn(fft.fftshift(img)))
 
     def kspace_to_img(self, kspace):
-        return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
+        return np.abs(fft.ifftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
 
 if __name__ == "__main__":
@@ -700,7 +738,7 @@ if __name__ == "__main__":
         return fft.ifftshift(fft.fftn(fft.fftshift(img)))
 
     def kspace_to_img(kspace):
-        return np.abs(fft.fftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
+        return np.abs(fft.ifftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
     the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
 
