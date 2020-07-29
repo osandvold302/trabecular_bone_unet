@@ -24,7 +24,6 @@ from tensorflow.python import roll
 import tqdm
 import os
 import glob
-from helper import fftshift, ifftshift
 from tensorflow.keras.layers import Lambda
 
 
@@ -45,7 +44,8 @@ class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
-        project_folder,
+        bool_2d=True, 
+        #project_folder,
         batch_size,
         max_epoch,
         model_name,
@@ -73,7 +73,7 @@ class CNN:
         tf.logging.set_verbosity(tf.logging.ERROR)
         tf.set_random_seed(seed=1)
 
-        self.project_folder = project_folder
+        #self.project_folder = project_folder
 
         self.layerinfo = layerinfo
         self.training_loss = []
@@ -95,6 +95,9 @@ class CNN:
         self.batch_size = batch_size
         self.model_name = model_name
 
+        self.bool_2d = bool_2d
+
+        '''
         if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
             self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
 
@@ -118,11 +121,13 @@ class CNN:
 
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
+        '''
 
         self.my_gen = data_generator(
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
             poly_distance_order=polyfit_order,
+            bool_2d=self.bool_2d
         )
 
         (
@@ -314,7 +319,8 @@ class CNN:
 
         # Define the image generator
         # NOTE: MOve this to the init once its done
-        save_str = self.save_dir + self.model_name
+        # TODO: save the model when you're confident lol
+        # save_str = self.save_dir + self.model_name
 
         steps_per_epoch_train = int(np.ceil(self.num_train / self.batch_size))
         steps_per_epoch_valid = int(np.ceil(self.num_valid / self.batch_size))
@@ -335,7 +341,7 @@ class CNN:
             for counter in tqdm.tqdm(range(steps_per_epoch_train)):
 
                 batch_input_subsampled_train, batch_label_fullysampled_train, batch_kspace_mask_train = self.my_gen.generator(
-                    batch_ind=counter, is_train=True, is_image_space=self.is_image_space
+                    batch_ind=counter, is_train=True
                 )
 
                 if self.is_image_space:
@@ -384,7 +390,6 @@ class CNN:
                 ) = self.my_gen.generator(
                     batch_ind=counter,
                     is_train=False,
-                    is_image_space=self.is_image_space,
                 )
 
                 if self.is_image_space:
@@ -422,10 +427,10 @@ class CNN:
 
             if (epoch_num + 1) % 100 == 0:
                 print("SAVING MODEL . . . ")
-
-                self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
-
-        self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+                # TODO: Save model in future
+                #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+        # TODO: save the model
+        #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
 
     def load(self):
 
@@ -448,6 +453,7 @@ class CNN:
         self.saver = tf.train.import_meta_graph(meta_graph_name)
 
         self.saver.restore(self.sess, self.save_model_name)
+
     def load_submission(self, model_location):
 
         tf.reset_default_graph()
@@ -770,21 +776,29 @@ def main():
     """
         Tests the CNN.
 
-        """
+    """
+    parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
+    parser.add_argument('--2d', dest='run_2d', action='store_true')
+    parser.add_argument('--3d', dest='run_2d', action='store_false')
+    parser.set_defaults(run_2d=True)
 
+    args = parser.parse_args()
+
+    run_2d = args.run_2d
+
+    '''
     if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
         study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
         project_folder = "E:/ENM_Project/"
     elif os.path.isdir("/run/media/bellowz"):
         study_dir = "/run/media/bellowz/S*/ENM_Project/SPGR_AF2_242_242_1500_um/"
         project_folder = "/run/media/bellowz/Seagate Backup Plus Drive/ENM_Project/"
-
+    '''
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
-    is_image_space = False
-    batch_size = 3
-    acc_factor = 5
+    batch_size = 10
+    acc_factor = 2
     max_epoch = 200
     polyfit = 4
     lr = 1e-4
@@ -795,12 +809,13 @@ def main():
     )
 
     convnet = CNN(
-        project_folder=project_folder,
+        bool_2d=run_2d,
+        #project_folder=project_folder,
         batch_size=batch_size,
         max_epoch=max_epoch,
         model_name=name,
         learn_rate=lr,
-        is_image_space=is_image_space,
+        is_image_space=True,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
     )
