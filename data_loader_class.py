@@ -268,7 +268,7 @@ class data_generator:
 
 
         return (
-            num_train,
+         num_train,
             num_valid,
             num_channels,
             img_height,

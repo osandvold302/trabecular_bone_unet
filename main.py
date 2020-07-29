@@ -451,7 +451,7 @@ class CNN:
 
         self.saver.restore(self.sess, self.save_model_name)
 
-   def load_submission(self, model_location):
+    def load_submission(self, model_location):
 
         tf.reset_default_graph()
 
