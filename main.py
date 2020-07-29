@@ -315,7 +315,8 @@ class CNN:
 
         # Define the image generator
         # NOTE: MOve this to the init once its done
-        save_str = self.save_dir + self.model_name
+        # TODO: save the model when you're confident lol
+        # save_str = self.save_dir + self.model_name
 
         steps_per_epoch_train = int(np.ceil(self.num_train / self.batch_size))
         steps_per_epoch_valid = int(np.ceil(self.num_valid / self.batch_size))
@@ -423,10 +424,10 @@ class CNN:
 
             if (epoch_num + 1) % 100 == 0:
                 print("SAVING MODEL . . . ")
-
-                self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
-
-        self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+                # TODO: Save model in future
+                #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+        # TODO: save the model
+        #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
 
     def load(self):
 
@@ -449,7 +450,8 @@ class CNN:
         self.saver = tf.train.import_meta_graph(meta_graph_name)
 
         self.saver.restore(self.sess, self.save_model_name)
-    def load_submission(self, model_location):
+
+   def load_submission(self, model_location):
 
         tf.reset_default_graph()
 
