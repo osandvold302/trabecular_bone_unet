@@ -337,7 +337,7 @@ class CNN:
             for counter in tqdm.tqdm(range(steps_per_epoch_train)):
 
                 batch_input_subsampled_train, batch_label_fullysampled_train, batch_kspace_mask_train = self.my_gen.generator(
-                    batch_ind=counter, is_train=True, is_image_space=self.is_image_space
+                    batch_ind=counter, is_train=True
                 )
 
                 if self.is_image_space:
@@ -386,7 +386,6 @@ class CNN:
                 ) = self.my_gen.generator(
                     batch_ind=counter,
                     is_train=False,
-                    is_image_space=self.is_image_space,
                 )
 
                 if self.is_image_space:
