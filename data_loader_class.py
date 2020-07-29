@@ -249,6 +249,30 @@ class data_generator:
                 # self.kspace_std
             )
 
+    def get_info(self):
+        print("\n Returning Dataset Info . . . \n")
+        num_train = num_channels = img_height = img_width = num_slices = 0
+
+        if self.is_2d:
+            (num_train, num_channels, img_height, img_width) = self.train_kspace.shape
+            (num_valid, _, _, _) = self.valid_kspace.shape
+        else:
+            (num_train, num_channels, img_height, img_width, num_slices) = self.train_kspace.shape
+            (num_valid, _, _, _) = self.valid_kspace.shape
+
+
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
+
     def generator(
         self, batch_ind, is_train=True, is_image_space=True, return_masks=True
     ):
