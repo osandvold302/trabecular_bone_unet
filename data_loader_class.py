@@ -68,6 +68,8 @@ class data_generator:
 
         super(data_generator, self).__init__()
 
+        self.study_dir = study_dir
+
         # self.standardize_data = True
         self.standardize_data = True
 
@@ -87,14 +89,18 @@ class data_generator:
 
 
     def load_data(self):
-        # print("\nLoading images and kspace . . . \n")
+        print("\nLoading images and kspace . . . \n")
 
         study_dir = self.study_dir
-        # scan_files = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        # scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
+        
+        #lsni
+        study_dir = '/d1/hip/DL/SPGR_AF2_242_242_1500_um/'
+
+        # scan_fils = glob.glob(study_dir + "*\\data\\dataFile.mat")
+        scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
         
         # Used for cluster
-        scan_files = glob.glob(study_dir + "12*dataFile.mat")
+        #scan_files = glob.glob(study_dir + "12*dataFile.mat")
 
         scan_name_list = []
 
@@ -124,6 +130,7 @@ class data_generator:
 
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
+                print(self.is_2d)
                 if self.is_2d:
                     # NOTE: OUTPUT SHOULD HAVE SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH)
@@ -163,7 +170,6 @@ class data_generator:
                     img_stack[counter, 0, :, :] = img[:, :, 29]
                     kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
-                # TODO: Check img_to_kspace can handle 3d volumes
                 img_stack[counter, 0, :, :, :] = img
                 kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
 
@@ -261,17 +267,17 @@ class data_generator:
             (num_valid, _, _, _) = self.valid_kspace.shape
 
 
-            return (
-                num_train,
-                num_valid,
-                num_channels,
-                img_height,
-                img_width,
-                self.train_names,
-                self.valid_names,
-                # self.kspace_mean,
-                # self.kspace_std
-            )
+        return (
+            num_train,
+            num_valid,
+            num_channels,
+            img_height,
+            img_width,
+            self.train_names,
+            self.valid_names,
+            # self.kspace_mean,
+            # self.kspace_std
+        )
 
     def generator(
         self, batch_ind, is_train=True, is_image_space=True, return_masks=True
@@ -768,6 +774,7 @@ if __name__ == "__main__":
 
     logger.info('Data generator init complete')
 
+    ''' deprecated?
     gen_tf = True
 
     if gen_tf:
@@ -840,3 +847,4 @@ if __name__ == "__main__":
 
         # show_3d_images(plot_train_kspace)
         show_3d_images(plot_train_images)
+    '''

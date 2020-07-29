@@ -24,7 +24,6 @@ from tensorflow.python import roll
 import tqdm
 import os
 import glob
-from helper import fftshift, ifftshift
 from tensorflow.keras.layers import Lambda
 
 
@@ -45,7 +44,7 @@ class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
-        project_folder,
+        #project_folder,
         batch_size,
         max_epoch,
         model_name,
@@ -73,7 +72,7 @@ class CNN:
         tf.logging.set_verbosity(tf.logging.ERROR)
         tf.set_random_seed(seed=1)
 
-        self.project_folder = project_folder
+        #self.project_folder = project_folder
 
         self.layerinfo = layerinfo
         self.training_loss = []
@@ -95,6 +94,7 @@ class CNN:
         self.batch_size = batch_size
         self.model_name = model_name
 
+        '''
         if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
             self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
 
@@ -118,11 +118,12 @@ class CNN:
 
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
+        '''
 
         self.my_gen = data_generator(
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
-            poly_distance_order=polyfit_order,
+            poly_distance_order=polyfit_order
         )
 
         (
@@ -771,20 +772,20 @@ def main():
         Tests the CNN.
 
         """
-
+    '''
     if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
         study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
         project_folder = "E:/ENM_Project/"
     elif os.path.isdir("/run/media/bellowz"):
         study_dir = "/run/media/bellowz/S*/ENM_Project/SPGR_AF2_242_242_1500_um/"
         project_folder = "/run/media/bellowz/Seagate Backup Plus Drive/ENM_Project/"
-
+    '''
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
     is_image_space = False
-    batch_size = 3
-    acc_factor = 5
+    batch_size = 10
+    acc_factor = 2
     max_epoch = 200
     polyfit = 4
     lr = 1e-4
@@ -795,7 +796,7 @@ def main():
     )
 
     convnet = CNN(
-        project_folder=project_folder,
+        #project_folder=project_folder,
         batch_size=batch_size,
         max_epoch=max_epoch,
         model_name=name,
