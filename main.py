@@ -44,6 +44,7 @@ class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
+        bool_2d=True, 
         #project_folder,
         batch_size,
         max_epoch,
@@ -94,6 +95,8 @@ class CNN:
         self.batch_size = batch_size
         self.model_name = model_name
 
+        self.bool_2d = bool_2d
+
         '''
         if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
             self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
@@ -123,7 +126,8 @@ class CNN:
         self.my_gen = data_generator(
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
-            poly_distance_order=polyfit_order
+            poly_distance_order=polyfit_order,
+            bool_2d=self.bool_2d
         )
 
         (
@@ -772,7 +776,16 @@ def main():
     """
         Tests the CNN.
 
-        """
+    """
+    parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
+    parser.add_argument('--2d', dest='run_2d', action='store_true')
+    parser.add_argument('--3d', dest='run_2d', action='store_false')
+    parser.set_defaults(run_2d=True)
+
+    args = parser.parse_args()
+
+    run_2d = args.run_2d
+
     '''
     if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
         study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
@@ -784,7 +797,6 @@ def main():
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
-    is_image_space = False
     batch_size = 10
     acc_factor = 2
     max_epoch = 200
@@ -797,12 +809,13 @@ def main():
     )
 
     convnet = CNN(
+        bool_2d=run_2d,
         #project_folder=project_folder,
         batch_size=batch_size,
         max_epoch=max_epoch,
         model_name=name,
         learn_rate=lr,
-        is_image_space=is_image_space,
+        is_image_space=True,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
     )
