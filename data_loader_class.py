@@ -317,7 +317,7 @@ class data_generator:
 
             # NOTE: GENERATE THE SUBSAMPLED TRAIN DATA
             (kspace_batch_subsampled, kspace_batch_mask) = self.mask_kspace(
-                full_kspace=kspace_batch_full, is_image_space=is_image_space
+                full_kspace=kspace_batch_full
             )
 
             (batch_dim, channel_dim, height_dim, width_dim) = kspace_batch_full.shape
