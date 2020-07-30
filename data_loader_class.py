@@ -292,7 +292,7 @@ class data_generator:
 
 
     def generator(
-        self, batch_ind, is_train=True, is_image_space=True, return_masks=True
+        self, batch_ind, is_train=True, return_masks=True
     ):
 
         if batch_ind == 0 and self.bool_shuffle:
@@ -334,94 +334,34 @@ class data_generator:
 
             (batch_dim, channel_dim, height_dim, width_dim) = kspace_batch_full.shape
 
-            if is_image_space:
-                ####
-                ####    IMAGE DOMAIN
-                ####
+            ####
+            ####    IMAGE DOMAIN
+            ####
 
-                image_fullysampled_label = np.zeros(
-                   self.train_images.shape 
+            image_fullysampled_label = np.zeros(
+                self.train_images.shape 
+            )
+
+            image_subsampled_input = np.zeros(
+               self.train_images.shape 
+            )
+
+            for counter in range(batch_dim):
+                image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
+                    kspace_batch_full[counter, 0, :, :]
+                )
+                image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
+                    kspace_batch_subsampled[counter, 0, :, :]
                 )
 
-                image_subsampled_input = np.zeros(
-                   self.train_images.shape 
+            if return_masks:
+                return (
+                    image_subsampled_input,
+                    image_fullysampled_label,
+                    kspace_batch_mask,
                 )
-
-                for counter in range(batch_dim):
-                    image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
-                        kspace_batch_full[counter, 0, :, :]
-                    )
-                    image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
-                        kspace_batch_subsampled[counter, 0, :, :]
-                    )
-
-                if return_masks:
-                    return (
-                        image_subsampled_input,
-                        image_fullysampled_label,
-                        kspace_batch_mask,
-                    )
-                else:
-                    return image_subsampled_input, image_fullysampled_label
-
             else:
-                ####
-                ####    KSPACE DOMAIN
-                ####
-
-                # IMAGES ARE SAVED AS
-
-                # kspace_batch_subsampled and kspace_batch_full are of the size
-                #   (batch_size,n_channels,img_height,img_width)
-                #   (batch,1,height,width)
-                #       because they are still complex numbers
-                kspace_batch_subsampled_real = np.squeeze(
-                    np.real(kspace_batch_subsampled)
-                )
-                # kspace_batch_subsampled_real = (kspace_batch_subsampled_real-self.kspace_mean[0])/self.kspace_std[1]
-
-                kspace_batch_subsampled_imag = np.squeeze(
-                    np.imag(kspace_batch_subsampled)
-                )
-                # kspace_batch_subsampled_real = (kspace_batch_subsampled_real-self.kspace_mean[1])/self.kspace_std[1]
-
-                kspace_batch_fullysampled_real = np.squeeze(np.real(kspace_batch_full))
-
-                kspace_batch_fullysampled_imag = np.squeeze(np.imag(kspace_batch_full))
-                kspace_subsampled_input = np.zeros(
-                    (batch_dim, 2, height_dim, width_dim)
-                )
-                kspace_fullysampled_label = np.zeros(
-                    (batch_dim, 2, height_dim, width_dim)
-                )
-
-                kspace_subsampled_input[:, 0, :, :] = kspace_batch_subsampled_real
-                kspace_subsampled_input[:, 1, :, :] = kspace_batch_subsampled_imag
-
-                kspace_fullysampled_label[:, 0, :, :] = kspace_batch_fullysampled_real
-                kspace_fullysampled_label[:, 1, :, :] = kspace_batch_fullysampled_imag
-
-                # print('SHAPES OF OUTPUTS \n\n\n')
-                # print(kspace_fullysampled_label.shape)
-                # print(kspace_subsampled_input.shape)
-                # print(aa)
-
-                tmp = kspace_batch_mask
-                kspace_batch_mask = np.zeros((batch_dim, 2, height_dim, width_dim))
-                kspace_batch_mask[:, 0, :, :] = np.squeeze(tmp)
-                kspace_batch_mask[:, 1, :, :] = np.squeeze(tmp)
-                kspace_batch_mask = 1 - kspace_batch_mask
-
-                # kspace_batch_mask = np.logical_not(kspace_batch_mask).astype(np.float32)
-
-                if return_masks:
-                    return (
-                        kspace_subsampled_input,
-                        kspace_fullysampled_label,
-                        kspace_batch_mask,
-                    )
-                else:
-                    return kspace_subsampled_input, kspace_fullysampled_label
+                return image_subsampled_input, image_fullysampled_label
 
 
     def shuffle_data(self):
