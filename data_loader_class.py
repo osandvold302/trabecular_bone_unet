@@ -362,6 +362,64 @@ class data_generator:
                 )
             else:
                 return image_subsampled_input, image_fullysampled_label
+        else:
+
+            # NOTE: IMGAES ARE SAVED AS
+            #  (NUM_TRAIN, NUM_CHANNELS, IMG_HEIGHT, IMG_WIDTH , NUM_SLICES)
+
+            (total_images, channel_dim, height_dim, width_dim, num_slices) = kspace_matrix.shape
+
+            steps_per_epoch = int(np.ceil(total_images / self.batch_size))
+
+            # for counter in range(steps_per_epoch):
+            # Images and Kspace matrices are of the order
+            # Height, Width, Scan_slice
+            # Readout, Phase Encoding, Center Slice of scan
+
+            start_ind = batch_ind * self.batch_size
+            end_ind = start_ind + self.batch_size
+
+            if end_ind > total_images:
+                end_ind = total_images
+                start_ind = total_images - self.batch_size
+
+            kspace_batch_full = kspace_matrix[start_ind:end_ind, :, :, :, :]
+
+            # NOTE: GENERATE THE SUBSAMPLED TRAIN DATA
+            (kspace_batch_subsampled, kspace_batch_mask) = self.mask_kspace(
+                full_kspace=kspace_batch_full
+            )
+
+            (batch_dim, channel_dim, height_dim, width_dim, num_slices) = kspace_batch_full.shape
+
+            ####
+            ####    IMAGE DOMAIN
+            ####
+
+            image_fullysampled_label = np.zeros(
+                self.train_images.shape 
+            )
+
+            image_subsampled_input = np.zeros(
+               self.train_images.shape 
+            )
+
+            for counter in range(batch_dim):
+                image_fullysampled_label[counter, :, :, :, :] = self.kspace_to_img(
+                    kspace_batch_full[counter, 0, :, :, :]
+                )
+                image_subsampled_input[counter, :, :, :, :] = self.kspace_to_img(
+                    kspace_batch_subsampled[counter, 0, :, :, :]
+                )
+
+            if return_masks:
+                return (
+                    image_subsampled_input,
+                    image_fullysampled_label,
+                    kspace_batch_mask,
+                )
+            else:
+                return image_subsampled_input, image_fullysampled_label
 
 
     def shuffle_data(self):
