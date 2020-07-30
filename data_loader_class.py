@@ -130,7 +130,6 @@ class data_generator:
 
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
-                print(self.is_2d)
                 if self.is_2d:
                     # NOTE: OUTPUT SHOULD HAVE SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH)
@@ -262,22 +261,35 @@ class data_generator:
         if self.is_2d:
             (num_train, num_channels, img_height, img_width) = self.train_kspace.shape
             (num_valid, _, _, _) = self.valid_kspace.shape
+
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
         else:
             (num_train, num_channels, img_height, img_width, num_slices) = self.train_kspace.shape
-            (num_valid, _, _, _) = self.valid_kspace.shape
+            (num_valid, _, _, _, _) = self.valid_kspace.shape
+            
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                num_slices,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
 
-
-        return (
-            num_train,
-            num_valid,
-            num_channels,
-            img_height,
-            img_width,
-            self.train_names,
-            self.valid_names,
-            # self.kspace_mean,
-            # self.kspace_std
-        )
 
     def generator(
         self, batch_ind, is_train=True, return_masks=True
@@ -322,36 +334,37 @@ class data_generator:
 
             (batch_dim, channel_dim, height_dim, width_dim) = kspace_batch_full.shape
 
-            ####
-            ####    IMAGE DOMAIN
-            ####
+            if is_image_space:
+                ####
+                ####    IMAGE DOMAIN
+                ####
 
-            image_fullysampled_label = np.zeros(
-                self.train_images.shape 
-            )
-
-            image_subsampled_input = np.zeros(
-                self.train_images.shape 
-            )
-
-            for counter in range(batch_dim):
-                image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
-                    kspace_batch_full[counter, 0, :, :]
-                )
-                image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
-                    kspace_batch_subsampled[counter, 0, :, :]
+                image_fullysampled_label = np.zeros(
+                   self.train_images.shape 
                 )
 
-            if return_masks:
-                return (
-                    image_subsampled_input,
-                    image_fullysampled_label,
-                    kspace_batch_mask,
+                image_subsampled_input = np.zeros(
+                   self.train_images.shape 
                 )
-            else:
-                return image_subsampled_input, image_fullysampled_label
+
+                for counter in range(batch_dim):
+                    image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
+                        kspace_batch_full[counter, 0, :, :]
+                    )
+                    image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
+                        kspace_batch_subsampled[counter, 0, :, :]
+                    )
+
+                if return_masks:
+                    return (
+                        image_subsampled_input,
+                        image_fullysampled_label,
+                        kspace_batch_mask,
+                    )
+                else:
+                    return image_subsampled_input, image_fullysampled_label
         else:
-            
+
             # NOTE: IMGAES ARE SAVED AS
             #  (NUM_TRAIN, NUM_CHANNELS, IMG_HEIGHT, IMG_WIDTH , NUM_SLICES)
 
@@ -393,11 +406,11 @@ class data_generator:
             )
 
             for counter in range(batch_dim):
-                image_fullysampled_label[counter, :, :, :, :] = self.kspace_to_img(
-                    kspace_batch_full[counter, 0, :, :, :]
+                image_fullysampled_label[counter, :, :, :] = self.kspace_to_img(
+                    kspace_batch_full[counter, 0, :, :]
                 )
-                image_subsampled_input[counter, :, :, :, :] = self.kspace_to_img(
-                    kspace_batch_subsampled[counter, 0, :, :, :]
+                image_subsampled_input[counter, :, :, :] = self.kspace_to_img(
+                    kspace_batch_subsampled[counter, 0, :, :]
                 )
 
             if return_masks:
