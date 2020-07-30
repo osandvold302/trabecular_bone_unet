@@ -405,6 +405,7 @@ class data_generator:
                     image_subsampled_input,
                     image_fullysampled_label,
                     kspace_batch_mask,
+                )
             else:
                 return image_subsampled_input, image_fullysampled_label
 
