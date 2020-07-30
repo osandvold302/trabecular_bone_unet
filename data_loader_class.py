@@ -130,7 +130,6 @@ class data_generator:
 
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
-                print(self.is_2d)
                 if self.is_2d:
                     # NOTE: OUTPUT SHOULD HAVE SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH)
@@ -262,22 +261,35 @@ class data_generator:
         if self.is_2d:
             (num_train, num_channels, img_height, img_width) = self.train_kspace.shape
             (num_valid, _, _, _) = self.valid_kspace.shape
+
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
         else:
             (num_train, num_channels, img_height, img_width, num_slices) = self.train_kspace.shape
-            (num_valid, _, _, _) = self.valid_kspace.shape
+            (num_valid, _, _, _, _) = self.valid_kspace.shape
+            
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                num_slices,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
 
-
-        return (
-            num_train,
-            num_valid,
-            num_channels,
-            img_height,
-            img_width,
-            self.train_names,
-            self.valid_names,
-            # self.kspace_mean,
-            # self.kspace_std
-        )
 
     def generator(
         self, batch_ind, is_train=True, is_image_space=True, return_masks=True
