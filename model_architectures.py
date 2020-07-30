@@ -19,8 +19,6 @@ from tensorflow.layers import Conv1D, Conv2D, Conv3D, Conv2DTranspose, Conv3DTra
 from tensorflow.layers import Dense, Dropout, Flatten, Layer
 from tensorflow.layers import MaxPooling1D, MaxPooling2D, MaxPooling3D
 from tensorflow.layers import BatchNormalization
-from tensorflow.keras import Input
-
 
 # from tensorflow.keras.layers import BatchNormalization
 # from tensorflow.keras.models import Sequential, Model
@@ -30,6 +28,7 @@ from tensorflow.keras import Input
 # from tensorflow.keras.layers import Conv3D, MaxPooling3D, UpSampling3D, Activation, BatchNormalization, PReLU, SpatialDropout3D
 # from tensorflow.keras.layers import Conv3DTranspose
 from tensorflow.keras.layers import concatenate
+from tensorflow.keras.layers import UpSampling3D
 # from tensorflow.keras.layers import Permute
 # from tensorflow.keras.optimizers import SGD, RMSprop, Adam
 import os
@@ -140,9 +139,7 @@ def unet_7_layers_3D(input_tensor):
 	return prediction
 
 
-def unet_9_layers_3D(input_shape):
-
-	img_input = Input(input_shape)
+def unet_9_layers_3D(input_tensor):
 
 	# print('INPUT IMAGE SHAPE')
 	# print(img_input.shape)
@@ -156,7 +153,7 @@ def unet_9_layers_3D(input_shape):
 	filt=(32,64,128,256,512)
 	# filt=(64,128,256,512,1024)
 
-	conv1 = conv_block_simple_3d(prevlayer=img_input, num_filters=filt[0], prefix="conv1")
+	conv1 = conv_block_simple_3d(prevlayer=input_tensor, num_filters=filt[0], prefix="conv1")
 	conv1 = conv_block_simple_3d(prevlayer=conv1, num_filters=filt[0], prefix="conv1_1")
 	pool1 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
 		padding="same",data_format="channels_first",name="pool1")(conv1)
