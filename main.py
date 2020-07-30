@@ -50,7 +50,6 @@ class CNN:
         max_epoch,
         model_name,
         learn_rate=1e-3,
-        is_image_space=True,
         acceleration_factor=4,
         polyfit_order=3,
         *layerinfo
@@ -88,7 +87,6 @@ class CNN:
         self.img_height = 512
         self.img_width = 512
 
-        self.is_image_space = is_image_space
         self.acceleration_factor = acceleration_factor
         self.dtype = tf.float32
 
@@ -96,32 +94,6 @@ class CNN:
         self.model_name = model_name
 
         self.bool_2d = bool_2d
-
-        '''
-        if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
-            self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
-
-            if self.is_image_space:
-                self.project_folder = project_folder + "Saved_Models\\ImageSpace\\"
-                self.save_dir = self.project_folder + self.model_name + "\\"
-            else:
-                self.project_folder = project_folder + "Saved_Models\\KSpace\\"
-                self.save_dir = self.project_folder + self.model_name + "\\"
-
-        elif os.path.isdir("/run/media/bellowz"):
-            self.study_dir = (
-                "/run/media/bellowz/S*/ENM_Project/SPGR_AF2_242_242_1500_um/"
-            )
-            if self.is_image_space:
-                self.project_folder = project_folder + "Saved_Models/ImageSpace/"
-                self.save_dir = self.project_folder + self.model_name + "/"
-            else:
-                self.project_folder = project_folder + "Saved_Models/KSpace/"
-                self.save_dir = self.project_folder + self.model_name + "/"
-
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
-        '''
 
         self.my_gen = data_generator(
             batch_size=self.batch_size,
@@ -150,39 +122,18 @@ class CNN:
         self.sess = tf.Session(config=config_options)
         # Define the Tensorflow Session
 
-        if self.is_image_space:
+        # ####
+        # #### IMAGE SPACE - 4 DIMENSIONS:
+        # ####
+        # Batch_dim is set to None so it can be modified later on
+        # Num_channels should be size 1
 
-            # ####
-            # #### IMAGE SPACE - 4 DIMENSIONS:
-            # ####
-            # Batch_dim is set to None so it can be modified later on
-            # Num_channels should be size 1
-
-            self.input_matrix_shape = (
-                None,
-                self.num_channels,
-                self.img_height,
-                self.img_width,
-            )
-
-        else:
-
-            ####
-            #### IMAGE SPACE - 5 DIMENSIONS:
-            ####
-            # Extra 2 dimensions are for Real and Imag
-
-            # NOTE: THIS IS FOR 3D MODEL
-            # self.input_matrix_shape = (
-            #     None,
-            #     self.num_channels,
-            #     2,
-            #     self.img_height,
-            #     self.img_width,
-            # )
-
-            # NOTE: THIS IS FOR 2D MODEL
-            self.input_matrix_shape = (None, 2, self.img_height, self.img_width)
+        self.input_matrix_shape = (
+            None,
+            self.num_channels,
+            self.img_height,
+            self.img_width,
+        )
 
         self.input_subsampled_placeholder = tf.placeholder(
             dtype=self.dtype, shape=self.input_matrix_shape
@@ -205,21 +156,11 @@ class CNN:
         #     predictions=self.output_predicted_placeholder,
         # )
 
-        if self.is_image_space:
-
-            self.loss = self.custom_image_loss(
-                y_true=self.label_fullysampled_placeholder,
-                y_pred=self.output_predicted_placeholder,
-                kspace_mask=self.kspace_mask_placeholder,
-            )
-
-        else:
-
-            self.loss = self.custom_kspace_loss(
-                y_true=self.label_fullysampled_placeholder,
-                y_pred=self.output_predicted_placeholder,
-                not_kspace_mask=self.kspace_mask_placeholder,
-            )
+        self.loss = self.custom_image_loss(
+            y_true=self.label_fullysampled_placeholder,
+            y_pred=self.output_predicted_placeholder,
+            kspace_mask=self.kspace_mask_placeholder,
+        )
 
         self.optimizer_type = tf.train.AdamOptimizer(learning_rate=self.learn_rate)
 
@@ -248,31 +189,8 @@ class CNN:
         # else:
         #     casted = False
 
-        if self.is_image_space:
 
-            tensor_output = model_architectures.unet_9_layers(tensor_input)
-
-        else:
-
-            # tensor_output_unscaled = model_architectures.unet_9_layers(tensor_input,output_tensor_channels=2)
-
-            # tensor_output_real = Lambda( lambda tensor_output_unscaled: tensor_output_unscaled[:,0,:,:])(tensor_output_unscaled)
-            # tensor_output_imag = Lambda( lambda tensor_output_unscaled: tensor_output_unscaled[:,1,:,:])(tensor_output_unscaled)
-
-            # tensor_output_real = tensor_output_real*self.kspace_std[0]+self.kspace_mean[0]
-            # tensor_output_imag = tensor_output_imag*self.kspace_std[1]+self.kspace_mean[1]
-
-            # print(tensor_output_imag.shape)
-            # print(tensor_output_real.shape)
-            # print('\n\n\n')
-
-            # tensor_output = tf.concat([tensor_output_real,tensor_output_imag],axis=1)
-            tensor_output = model_architectures.unet_9_layers(
-                tensor_input, output_tensor_channels=2
-            )
-
-        # if casted:
-        #     input = original_class(input)
+        tensor_output = model_architectures.unet_9_layers(tensor_input)
 
         return tensor_output
 
@@ -344,21 +262,12 @@ class CNN:
                     batch_ind=counter, is_train=True
                 )
 
-                if self.is_image_space:
 
-                    tf_dict_train = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_train,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_train,
-                        self.kspace_mask_placeholder: batch_kspace_mask_train,
-                    }
-
-                else:
-
-                    tf_dict_train = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_train,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_train,
-                        self.kspace_mask_placeholder: batch_kspace_mask_train,
-                    }
+                tf_dict_train = {
+                    self.input_subsampled_placeholder: batch_input_subsampled_train,
+                    self.label_fullysampled_placeholder: batch_label_fullysampled_train,
+                    self.kspace_mask_placeholder: batch_kspace_mask_train,
+                }
 
 
                 # Run a forward pass and backpropagation and output the optimizer state and loss value
@@ -392,21 +301,12 @@ class CNN:
                     is_train=False,
                 )
 
-                if self.is_image_space:
 
-                    tf_dict_valid = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_valid,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
-                        self.kspace_mask_placeholder: batch_kspace_mask_valid,
-                    }
-
-                else:
-
-                    tf_dict_valid = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_valid,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
-                        self.kspace_mask_placeholder: batch_kspace_mask_valid,
-                    }
+                tf_dict_valid = {
+                    self.input_subsampled_placeholder: batch_input_subsampled_valid,
+                    self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
+                    self.kspace_mask_placeholder: batch_kspace_mask_valid,
+                }
 
                 # Run a forward pass without backpropagation and save loss value
                 valid_batch_loss = self.sess.run(self.loss, tf_dict_valid)
@@ -510,10 +410,7 @@ class CNN:
         # print(x.shape)
         # print('\n\n\n')
 
-        if self.is_image_space:
-            return roll(input=x, shift=shift, axis=[2, 3])
-        else:
-            return roll(input=x, shift=shift, axis=[1, 2])
+        return roll(input=x, shift=shift, axis=[2, 3])
 
     def ifftshift(self, x):
         """
@@ -538,10 +435,7 @@ class CNN:
         # print('\n\n\n')
 
         shift = [-int(x_dim // 2), -int(y_dim // 2)]
-        if self.is_image_space:
-            return roll(input=x, shift=shift, axis=[2, 3])
-        else:
-            return roll(input=x, shift=shift, axis=[1, 2])
+        return roll(input=x, shift=shift, axis=[2, 3])
 
     def kspace_to_image(self, kspace):
 
@@ -815,7 +709,6 @@ def main():
         max_epoch=max_epoch,
         model_name=name,
         learn_rate=lr,
-        is_image_space=True,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
     )
