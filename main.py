@@ -545,38 +545,53 @@ class CNN:
         # y_pred_t = tf.transpose(y_pred,perm=[0,2,3,1])
         # # NOW IT IS SIZE BATCH, HEIGHT, WIDTH, NUM_CHANNELS
 
-        # Range of 0.5-0.001
+        if self.bool_2d:
+            # ## Make conv kernels
 
-        # #####
-        # #####   X AND Y DERIVATIVES
-        # #####
+            dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
 
-        # ## Make conv kernels
+            dy_filter = tf.constant(dy_filter_np, dtype=self.dtype, shape=(3, 3, 1, 1))
 
-        dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+            dy_true = tf.nn.conv2d(
+                input=y_true,
+                filter=dy_filter,
+                strides=(1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
 
-        dy_filter = tf.constant(dy_filter_np, dtype=self.dtype, shape=(3, 3, 1, 1))
+            dy_pred = tf.nn.conv2d(
+                input=y_pred,
+                filter=dy_filter,
+                strides=(1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
 
-        dy_true = tf.nn.conv2d(
-            input=y_true,
-            filter=dy_filter,
-            strides=(1, 1, 1, 1),
-            padding="VALID",
-            data_format="NCHW",
-        )
+            # # Compute derivatvies
+            mse_dy = tf.losses.mean_squared_error(labels=dy_true, predictions=dy_pred)
 
-        dy_pred = tf.nn.conv2d(
-            input=y_pred,
-            filter=dy_filter,
-            strides=(1, 1, 1, 1),
-            padding="VALID",
-            data_format="NCHW",
-        )
+            loss = mse + kspace_loss + mse_dy
+        else:
+            dy_dz_true = tf.nn.conv3d(
+                input=y_true,
+                strides=(1, 1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
 
-        # # Compute derivatvies
-        mse_dy = tf.losses.mean_squared_error(labels=dy_true, predictions=dy_pred)
+            dy_dz_pred = tf.nn.conv3d(
+                input=y_pred,
+                strides=(1, 1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
+            
+            # # Compute derivatvies
+            mse_dy_dz = tf.losses.mean_squared_error(labels=dy_dz_true, predictions=dy_dz_pred)
 
-        loss = mse + kspace_loss + mse_dy
+            loss = mse + kspace_loss + mse_dy_dz
+        
         return loss
 
 

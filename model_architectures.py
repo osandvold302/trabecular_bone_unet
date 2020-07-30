@@ -19,6 +19,7 @@ from tensorflow.layers import Conv1D, Conv2D, Conv3D, Conv2DTranspose, Conv3DTra
 from tensorflow.layers import Dense, Dropout, Flatten, Layer
 from tensorflow.layers import MaxPooling1D, MaxPooling2D, MaxPooling3D
 from tensorflow.layers import BatchNormalization
+from tensorflow.keras import Input
 
 
 # from tensorflow.keras.layers import BatchNormalization
@@ -34,8 +35,6 @@ from tensorflow.keras.layers import concatenate
 import os
 import numpy as np
 import tensorflow as tf
-
-
 
 # def conv_block_simple_3d(prevlayer, num_filters, prefix, kernel_size=(2,3,3),initializer="he_normal", strides=(1, 1, 1)):
 def conv_block_simple_3d(prevlayer, num_filters, prefix, kernel_size=(2,3,3),initializer="glorot_normal", strides=(1, 1, 1)):
