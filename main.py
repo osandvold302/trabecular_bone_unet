@@ -25,6 +25,7 @@ import tqdm
 import os
 import glob
 from tensorflow.keras.layers import Lambda
+import argparse
 
 
 #############
@@ -44,11 +45,11 @@ class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
-        bool_2d=True, 
         #project_folder,
         batch_size,
         max_epoch,
         model_name,
+        bool_2d=True, 
         learn_rate=1e-3,
         acceleration_factor=4,
         polyfit_order=3,
@@ -102,15 +103,28 @@ class CNN:
             bool_2d=self.bool_2d
         )
 
-        (
-            self.num_train,
-            self.num_valid,
-            self.num_channels,
-            self.img_height,
-            self.img_width,
-            _,
-            _,
-        ) = self.my_gen.get_info()
+        if self.bool_2d:
+            (
+                self.num_train,
+                self.num_valid,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                _,
+                _,
+            ) = self.my_gen.get_info()
+        else:
+            (
+                self.num_train,
+                self.num_valid,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                self.num_slices,
+                _,
+                _
+            ) = self.my_gen.get_info()
+            
 
         real_imag_dim = 2
 
@@ -128,12 +142,21 @@ class CNN:
         # Batch_dim is set to None so it can be modified later on
         # Num_channels should be size 1
 
-        self.input_matrix_shape = (
-            None,
-            self.num_channels,
-            self.img_height,
-            self.img_width,
-        )
+        if self.bool_2d:
+            self.input_matrix_shape = (
+                None,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+            )
+        else:
+            self.input_matrix_shape = (
+                None,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                self.num_slices
+          )
 
         self.input_subsampled_placeholder = tf.placeholder(
             dtype=self.dtype, shape=self.input_matrix_shape
@@ -150,11 +173,6 @@ class CNN:
         self.kspace_mask_placeholder = tf.placeholder(
             dtype=self.dtype, shape=self.input_matrix_shape
         )
-
-        # self.loss = tf.losses.mean_squared_error(
-        #     labels=self.label_fullysampled_placeholder,
-        #     predictions=self.output_predicted_placeholder,
-        # )
 
         self.loss = self.custom_image_loss(
             y_true=self.label_fullysampled_placeholder,
@@ -189,8 +207,10 @@ class CNN:
         # else:
         #     casted = False
 
-
-        tensor_output = model_architectures.unet_9_layers(tensor_input)
+        if self.bool_2d:
+            tensor_output = model_architectures.unet_9_layers(tensor_input)
+        else:
+            tensor_output = model_architectures.unet_9_layers_3D(tensor_input)
 
         return tensor_output
 
@@ -527,59 +547,15 @@ class CNN:
 
         # Range of 0.5-0.001
 
-        # ssim = tf.reduce_mean(tf.image.ssim_multiscale(
-        #     img1=y_true,
-        #     img2=y_pred,
-        #     max_val=1
-        #     ))
-
-        # RANGE OF 0.4-0.008
-
-        # total_variation = tf.reduce_mean(
-        #     tf.image.total_variation(
-        #         images=y_pred)
-        #     )
-        # 4k max
-
-        # dy_true,dx_true = tf.image.image_gradients(image=y_true)
-        # dy_pred,dx_pred = tf.image.image_gradients(image=y_pred)
-
         # #####
         # #####   X AND Y DERIVATIVES
         # #####
 
         # ## Make conv kernels
 
-        # dx_filter_np = np.array([
-        #     [-1,-2,-1],
-        #     [0,0,0],
-        #     [1,2,1]])
-
         dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
 
-        # dx_filter = tf.constant(dx_filter_np,dtype=self.dtype,shape=(3,3,1,1))
         dy_filter = tf.constant(dy_filter_np, dtype=self.dtype, shape=(3, 3, 1, 1))
-
-        # dx_filter_np = np.array([
-        #     [-1],
-        #     [0],
-        #     [1]])
-
-        # dy_filter_np = np.array([
-        #     [-1,0,1],
-        #     ])
-
-        # dx_filter = tf.constant(dx_filter_np,dtype=self.dtype,shape=(3,1,1,1))
-        # dy_filter = tf.constant(dy_filter_np,dtype=self.dtype,shape=(1,3,1,1))
-
-        # # Apply convs to compute derivatives
-
-        # dx_true = tf.nn.conv2d(
-        #     input=y_true,
-        #     filter=dx_filter,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
 
         dy_true = tf.nn.conv2d(
             input=y_true,
@@ -588,13 +564,6 @@ class CNN:
             padding="VALID",
             data_format="NCHW",
         )
-
-        # dx_pred = tf.nn.conv2d(
-        #     input=y_pred,
-        #     filter=dx_filter,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
 
         dy_pred = tf.nn.conv2d(
             input=y_pred,
@@ -606,61 +575,6 @@ class CNN:
 
         # # Compute derivatvies
         mse_dy = tf.losses.mean_squared_error(labels=dy_true, predictions=dy_pred)
-        # # Range of 0.5-0.001
-
-        # mse_dx = tf.losses.mean_squared_error(
-        #     labels=dx_true,
-        #     predictions=dx_pred)
-
-        ## LAPLACIAN LOSS
-
-        # MSE DY + DX is 0.0069
-
-        # Central difference operator:
-        # [-1 0 1]
-        # OR SOBEL
-        # [ -1 -2 -1
-        # 0 0 0
-        # 1 2 1]
-
-        # laplacian_filter_np = np.array([
-        #     [-1,-1,-1],
-        #     [-1,8,-1],
-        #     [-1,-1,-1]])
-
-        # laplacian_filter_np = np.array([
-        #     [0,-1,0],
-        #     [-1,4,-1],
-        #     [0,-1,0]])
-
-        # # # NOTE: Conv2d takes input of (filter_height,filter_width,in_channels,out_channels)
-
-        # lap_filt = tf.constant(laplacian_filter_np,dtype=self.dtype,shape=(3,3,1,1))
-
-        # lap_true = tf.nn.conv2d(
-        #     input=y_true,
-        #     filter=lap_filt,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        # lap_pred = tf.nn.conv2d(
-        #     input=y_pred,
-        #     filter=lap_filt,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        # mse_lap = tf.losses.mean_squared_error(
-        #     labels=lap_true,
-        #     predictions=lap_pred)
-        # Max of around 0.5
-
-        # psnr = tf.reduce_mean(tf.image.psnr(
-        #     a=y_true,
-        #     b=y_pred,
-        #     max_val=1))
-        # Max of 12
 
         loss = mse + kspace_loss + mse_dy
         return loss
