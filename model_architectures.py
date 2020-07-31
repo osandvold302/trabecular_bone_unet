@@ -21,8 +21,7 @@ from tensorflow.layers import MaxPooling1D, MaxPooling2D, MaxPooling3D
 from tensorflow.layers import BatchNormalization
 
 # from tensorflow.keras.layers import BatchNormalization
-# from tensorflow.keras.models import Sequential, Model
-# from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Sequential, Model
 # from tensorflow.keras.layers import Flatten, Dense, Dropout, Lambda, Reshape
 # from tensorflow.keras.layers import Conv2D, UpSampling2D, SpatialDropout2D, MaxPooling2D, ZeroPadding2D, Conv2DTranspose
 # from tensorflow.keras.layers import Conv3D, MaxPooling3D, UpSampling3D, Activation, BatchNormalization, PReLU, SpatialDropout3D
@@ -158,37 +157,26 @@ def unet_9_layers_3D(input_tensor):
     pool1 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
         padding="same",data_format="channels_first",name="pool1")(conv1)
 
-    print(conv1.shape)
-
     conv2 = conv_block_simple_3d(prevlayer=pool1, num_filters=filt[1], prefix="conv2")
     conv2 = conv_block_simple_3d(prevlayer=conv2, num_filters=filt[1], prefix="conv2_1")
     pool2 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
         padding="same",data_format="channels_first",name="pool2")(conv2)
-
-    print(conv2.shape)
 
     conv3 = conv_block_simple_3d(prevlayer=pool2, num_filters=filt[2], prefix="conv3")
     conv3 = conv_block_simple_3d(prevlayer=conv3, num_filters=filt[2], prefix="conv3_1")
     pool3 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
         padding="same",data_format="channels_first",name="pool3")(conv3)
 
-    print(conv3.shape)
-
     conv4 = conv_block_simple_3d(prevlayer=pool3, num_filters=filt[3], prefix="conv4")
     conv4 = conv_block_simple_3d(prevlayer=conv4, num_filters=filt[3], prefix="conv4_1")
     pool4 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
         padding="same",data_format="channels_first",name="pool4")(conv4)
 
-    print(conv4.shape)
-
     conv5 = conv_block_simple_3d(prevlayer=pool4, num_filters=filt[4], prefix="conv_5")
     conv5 = conv_block_simple_3d(prevlayer=conv5, num_filters=filt[4], prefix="conv_5_1")
     conv5 = conv_block_simple_3d(prevlayer=conv5, num_filters=filt[4], prefix="conv_5_2")
     
-    print(conv5.shape)
-
     up6 = UpSampling3D(size=us_param,data_format=d_format)(conv5)
-    print(up6.shape)
 
     up6 = concatenate([up6, conv4], axis=1)
     conv6 = conv_block_simple_3d(prevlayer=up6, num_filters=filt[3], prefix="conv6_1")
@@ -196,7 +184,6 @@ def unet_9_layers_3D(input_tensor):
 
 
     up7 = UpSampling3D(size=us_param,data_format=d_format)(conv6)
-    print(up7.shape)
 
     up7 = concatenate([up7, conv3], axis=1)
     conv7 = conv_block_simple_3d(prevlayer=up7, num_filters=filt[2], prefix="conv7_1")
@@ -217,12 +204,11 @@ def unet_9_layers_3D(input_tensor):
     # conv9 = SpatialDropout2D(0.2,data_format=d_format)(conv9)
 
     prediction = Conv3D(filters=1, kernel_size=(1, 1, 1), activation="sigmoid", name="prediction", data_format=d_format)(conv9)
-    model = Model(img_input, prediction)
 
     # print('PREDICTION SHAPE')
     # print(prediction.shape)
 
-    return model
+    return prediction
 
 
 
