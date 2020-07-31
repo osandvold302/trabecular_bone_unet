@@ -540,11 +540,6 @@ class CNN:
             tf.square(tf.abs(kspace_true))
         )
 
-        # # (Batch, channels, height, widhth)
-        # y_true_t = tf.transpose(y_true,perm=[0,2,3,1])
-        # y_pred_t = tf.transpose(y_pred,perm=[0,2,3,1])
-        # # NOW IT IS SIZE BATCH, HEIGHT, WIDTH, NUM_CHANNELS
-
         if self.bool_2d:
             # ## Make conv kernels
 
@@ -574,20 +569,36 @@ class CNN:
             loss = mse + kspace_loss + mse_dy
         else:
             # TODO: get some sort of filter here--gauss?
-            gauss_filt = np.zeros((3,3,3))
+            gauss_filt_np = np.zeros((3,3,3))
+            gauss_filt_np[:,:,0] = [[6, 10, 6],
+                                  [10, 17, 10],
+                                  [6, 10,6]]
+            gauss_filt_np[:,:,1] = [[10, 17, 10],
+                                  [17, 28, 17],
+                                  [10, 17, 10]]
+            gauss_filt_np[:,:,2] = gauss_filt_np[:,:,0]
+
+            gauss_filt = tf.constant(gauss_filt_np, dtype=self.dtype, shape=(5,5,5,1,1))
+
+            # orignal order = (batch, channels, height, width, depth)
+            y_true_t = tf.transpose(y_true, perm=[0,1,4,2,3])
+            y_pred_t = tf.transpose(y_pred, perm=[0,1,4,2,3])
+            #  [batch, in_channels, in_depth, in_height, in_width]
 
             dy_dz_true = tf.nn.conv3d(
-                input=y_true,
+                input=y_true_t,
+                filter=gauss_filt,
                 strides=(1, 1, 1, 1, 1),
                 padding="VALID",
-                data_format="NCHW",
+                data_format="NCDHW",
             )
 
             dy_dz_pred = tf.nn.conv3d(
-                input=y_pred,
+                input=y_pred_t,
+                filter=gauss_filt,
                 strides=(1, 1, 1, 1, 1),
                 padding="VALID",
-                data_format="NCHW",
+                data_format="NCDHW",
             )
             
             # # Compute derivatvies
@@ -636,7 +647,6 @@ def main():
 
     convnet = CNN(
         bool_2d=run_2d,
-        #project_folder=project_folder,
         batch_size=batch_size,
         max_epoch=max_epoch,
         model_name=name,
