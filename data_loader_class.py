@@ -491,6 +491,7 @@ class data_generator:
 
         else:
             (total_train, num_channels, img_height, img_width, num_slices) = self.train_images.shape
+            (total_valid, num_channels, img_height, img_width, num_slices) = self.valid_images.shape
 
             ########
             ######## RANDOMIZE THE ORDER OF THE TRAIN DATA
@@ -558,7 +559,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=120, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=100, sample_tol=0.5)
             
             mask_2d = sub_mask
 
@@ -728,6 +729,9 @@ class data_generator:
         # Initialize output case it doesnt converge
 
         for counter in range(max_iter):
+
+            if counter%25 == 0:
+              print('Calculating mask #' + str(counter))
 
             candidate_mask = np.zeros(pdf.shape)
             # Create new candidate sampling mask
