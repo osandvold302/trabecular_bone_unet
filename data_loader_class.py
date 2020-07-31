@@ -121,6 +121,10 @@ class data_generator:
         num_scans = len(scan_files)
         print("num scans:" + str(num_scans))
 
+        # NOTE: ONCE AGAIN, MAJOR ASSUMPTION THAT ALL DATA IS SAME SIZE
+        # SO SORRY THIS IS GROSS
+        slices_power_of_2 = True
+        
         for counter in range(num_scans):
 
             img = loadmat(scan_files[counter])
@@ -128,6 +132,7 @@ class data_generator:
             # img = img["img"]
             img = img["D"] # NOTE: matfile has "D" key not "img"
 
+            
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
                 if self.is_2d:
@@ -147,7 +152,14 @@ class data_generator:
                     # NOTE: OUTPUT HAS SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
                     # (NUM_SCANS, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
-                    # (94, 1, 512, 512, 60)
+                    # (94, 1, 512, 512, 64)
+
+                    # NOTE: sample study has 60 slices, dupe first and last
+                    # slices to ensure 64 slices total
+                    if num_slices != 64:
+                        print('WARNING: Volume contains 60 slices, increasing to 64')
+                        num_slices = 64
+                        slices_power_of_2 = False
 
                     img_stack = np.zeros(
                         (num_scans, 1, img_height, img_width, num_slices), dtype=np.double
@@ -169,8 +181,18 @@ class data_generator:
                     img_stack[counter, 0, :, :] = img[:, :, 29]
                     kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
-                img_stack[counter, 0, :, :, :] = img
-                kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
+                if slices_power_of_2:
+                    img_stack[counter, 0, :, :, :] = img
+                    kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:,:])
+                else: # BIG ASSUMPTION is that num_slices = 60 to start
+                    # gimmicky sorry :<
+                    img_stack[counter, 0, :, :, 0:2] = np.dstack([img[:, :, 0]]*2)
+                    img_stack[counter, 0, :, :, 2:62] = img
+                    img_stack[counter, 0, :, :, 62:] = np.dstack([img[:,:,59]]*2)
+
+                    kspace_stack[counter, 0, :, :, 0:2] = np.dstack([self.img_to_kspace(img[:,:, 0])]*2)
+                    kspace_stack[counter, 0, :, :, 2:62] = self.img_to_kspace(img[:,:,:])
+                    kspace_stack[counter, 0, :, :, 62:] = np.dstack([self.img_to_kspace(img[:,:,59])]*2)
 
         return img_stack, kspace_stack, scan_name_list
 
