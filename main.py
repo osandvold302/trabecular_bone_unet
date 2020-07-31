@@ -210,7 +210,7 @@ class CNN:
         if self.bool_2d:
             tensor_output = model_architectures.unet_9_layers(tensor_input)
         else:
-            tensor_output = model_architectures.unet_9_layers_3D(tensor_input)
+            tensor_output = model_architectures.unet_7_layers_3D(tensor_input)
 
         return tensor_output
 
@@ -573,6 +573,9 @@ class CNN:
 
             loss = mse + kspace_loss + mse_dy
         else:
+            # TODO: get some sort of filter here--gauss?
+            gauss_filt = np.zeros((3,3,3))
+
             dy_dz_true = tf.nn.conv3d(
                 input=y_true,
                 strides=(1, 1, 1, 1, 1),
