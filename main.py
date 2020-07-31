@@ -578,7 +578,7 @@ class CNN:
                                   [10, 17, 10]]
             gauss_filt_np[:,:,2] = gauss_filt_np[:,:,0]
 
-            gauss_filt = tf.constant(gauss_filt_np, dtype=self.dtype, shape=(5,5,5,1,1))
+            gauss_filt = tf.constant(gauss_filt_np, dtype=self.dtype, shape=(3,3,3,1,1))
 
             # orignal order = (batch, channels, height, width, depth)
             y_true_t = tf.transpose(y_true, perm=[0,1,4,2,3])
