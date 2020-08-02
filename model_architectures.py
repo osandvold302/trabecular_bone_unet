@@ -201,6 +201,16 @@ def unet_9_layers_3D(input_tensor):
     conv9 = conv_block_simple_3d(prevlayer=up9, num_filters=filt[0], prefix="conv9_1")
     conv9 = conv_block_simple_3d(prevlayer=conv9, num_filters=filt[0], prefix="conv9_2")
 
+    print(conv1.shape)
+    print(conv2.shape)
+    print(conv3.shape)
+    print(conv4.shape)
+    print(conv5.shape)
+    print(conv6.shape)
+    print(conv7.shape)
+    print(conv8.shape)
+    print(conv9.shape)
+
     # conv9 = SpatialDropout2D(0.2,data_format=d_format)(conv9)
 
     prediction = Conv3D(filters=1, kernel_size=(1, 1, 1), activation="sigmoid", name="prediction", data_format=d_format)(conv9)
@@ -209,11 +219,6 @@ def unet_9_layers_3D(input_tensor):
     # print(prediction.shape)
 
     return prediction
-
-
-
-
-
 
 
 def unet_9_layers(input_tensor,output_tensor_channels = 1):
