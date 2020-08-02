@@ -52,6 +52,7 @@ def get_logger(name):
 class data_generator:
     def __init__(
         self,
+        logger='unset',
         #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
         study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
@@ -67,6 +68,12 @@ class data_generator:
     ):
 
         super(data_generator, self).__init__()
+
+        if logger=='unset':
+            self.logger = get_logger('data_generator')
+            self.logger.info('Initializing data generator')
+        else:
+            self.logger = logger
 
         self.study_dir = study_dir
 
@@ -89,7 +96,7 @@ class data_generator:
 
 
     def load_data(self):
-        print("\nLoading images and kspace . . . \n")
+        self.logger.info("\nLoading images and kspace . . . \n")
 
         study_dir = self.study_dir
         
@@ -97,7 +104,7 @@ class data_generator:
         study_dir = '/d1/hip/DL/SPGR_AF2_242_242_1500_um/'
 
         # scan_fils = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "2013*/data/dataFile.mat")
         
         # Used for cluster
         #scan_files = glob.glob(study_dir + "12*dataFile.mat")
@@ -119,8 +126,12 @@ class data_generator:
             scan_name_list.append(scan_name)
 
         num_scans = len(scan_files)
-        print("num scans:" + str(num_scans))
+        self.logger.info("num scans:" + str(num_scans))
 
+        # NOTE: ONCE AGAIN, MAJOR ASSUMPTION THAT ALL DATA IS SAME SIZE
+        # SO SORRY THIS IS GROSS
+        slices_power_of_2 = True
+        
         for counter in range(num_scans):
 
             img = loadmat(scan_files[counter])
@@ -128,9 +139,9 @@ class data_generator:
             # img = img["img"]
             img = img["D"] # NOTE: matfile has "D" key not "img"
 
+            
             if counter == 0:
                 (img_height, img_width, num_slices) = img.shape
-                print(self.is_2d)
                 if self.is_2d:
                     # NOTE: OUTPUT SHOULD HAVE SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH)
@@ -148,7 +159,14 @@ class data_generator:
                     # NOTE: OUTPUT HAS SHAPE
                     # (BATCH_DIM, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
                     # (NUM_SCANS, CHANNEL_DIM, IMG_HEIGHT, IMG_WIDTH, NUM_SLICES)
-                    # (94, 1, 512, 512, 60)
+                    # (94, 1, 512, 512, 64)
+
+                    # NOTE: sample study has 60 slices, dupe first and last
+                    # slices to ensure 64 slices total
+                    if num_slices != 64:
+                        self.logger.warning('WARNING: Volume contains 60 slices, increasing to 64')
+                        num_slices = 64
+                        slices_power_of_2 = False
 
                     img_stack = np.zeros(
                         (num_scans, 1, img_height, img_width, num_slices), dtype=np.double
@@ -170,13 +188,23 @@ class data_generator:
                     img_stack[counter, 0, :, :] = img[:, :, 29]
                     kspace_stack[counter, 0, :, :] = self.img_to_kspace(img[:, :, 29])
             else:
-                img_stack[counter, 0, :, :, :] = img
-                kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:, :])
+                if slices_power_of_2:
+                    img_stack[counter, 0, :, :, :] = img
+                    kspace_stack[counter, 0, :, :, :] = self.img_to_kspace(img[:,:,:])
+                else: # BIG ASSUMPTION is that num_slices = 60 to start
+                    # gimmicky sorry :<
+                    img_stack[counter, 0, :, :, 0:2] = np.dstack([img[:, :, 0]]*2)
+                    img_stack[counter, 0, :, :, 2:62] = img
+                    img_stack[counter, 0, :, :, 62:] = np.dstack([img[:,:,59]]*2)
+
+                    kspace_stack[counter, 0, :, :, 0:2] = np.dstack([self.img_to_kspace(img[:,:, 0])]*2)
+                    kspace_stack[counter, 0, :, :, 2:62] = self.img_to_kspace(img[:,:,:])
+                    kspace_stack[counter, 0, :, :, 62:] = np.dstack([self.img_to_kspace(img[:,:,59])]*2)
 
         return img_stack, kspace_stack, scan_name_list
 
     def split_train_and_valid(self, images, kspace, names_list):
-        print("\nSplitting Training And Valid Data . . . \n")
+        self.logger.info("\nSplitting Training And Valid Data . . . \n")
 
         total_images = len(names_list) # assumption that names = total num
         num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
@@ -236,7 +264,7 @@ class data_generator:
 
 
     def get_batch(self):
-        print("\n Getting batch . . . \n")
+        self.logger.info("\n Getting batch . . . \n")
 
         if self.is_2d:
 
@@ -256,28 +284,41 @@ class data_generator:
             )
 
     def get_info(self):
-        print("\n Returning Dataset Info . . . \n")
+        self.logger.info("\n Returning Dataset Info . . . \n")
         num_train = num_channels = img_height = img_width = num_slices = 0
 
         if self.is_2d:
             (num_train, num_channels, img_height, img_width) = self.train_kspace.shape
             (num_valid, _, _, _) = self.valid_kspace.shape
+
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
         else:
             (num_train, num_channels, img_height, img_width, num_slices) = self.train_kspace.shape
-            (num_valid, _, _, _) = self.valid_kspace.shape
+            (num_valid, _, _, _, _) = self.valid_kspace.shape
+            
+            return (
+                num_train,
+                num_valid,
+                num_channels,
+                img_height,
+                img_width,
+                num_slices,
+                self.train_names,
+                self.valid_names,
+                # self.kspace_mean,
+                # self.kspace_std
+            )
 
-
-        return (
-            num_train,
-            num_valid,
-            num_channels,
-            img_height,
-            img_width,
-            self.train_names,
-            self.valid_names,
-            # self.kspace_mean,
-            # self.kspace_std
-        )
 
     def generator(
         self, batch_ind, is_train=True, return_masks=True
@@ -328,10 +369,9 @@ class data_generator:
 
             image_fullysampled_label = np.zeros(
                 self.train_images.shape 
-            )
 
             image_subsampled_input = np.zeros(
-                self.train_images.shape 
+                self.train_images.shape
             )
 
             for counter in range(batch_dim):
@@ -351,7 +391,6 @@ class data_generator:
             else:
                 return image_subsampled_input, image_fullysampled_label
         else:
-            
             # NOTE: IMGAES ARE SAVED AS
             #  (NUM_TRAIN, NUM_CHANNELS, IMG_HEIGHT, IMG_WIDTH , NUM_SLICES)
 
@@ -378,6 +417,8 @@ class data_generator:
                 full_kspace=kspace_batch_full
             )
 
+            self.logger.debug("kspace full : " + str(kspace_batch_full.shape))
+            self.logger.debug("kspace batch mask shape: "+ str(kspace_batch_mask.shape))
             (batch_dim, channel_dim, height_dim, width_dim, num_slices) = kspace_batch_full.shape
 
             ####
@@ -389,7 +430,7 @@ class data_generator:
             )
 
             image_subsampled_input = np.zeros(
-                self.train_images.shape 
+               self.train_images.shape 
             )
 
             for counter in range(batch_dim):
@@ -399,6 +440,16 @@ class data_generator:
                 image_subsampled_input[counter, :, :, :, :] = self.kspace_to_img(
                     kspace_batch_subsampled[counter, 0, :, :, :]
                 )
+
+            if return_masks:
+                return (
+                    image_subsampled_input,
+                    image_fullysampled_label,
+                    kspace_batch_subsampled # TODO: IS THIS CORRECT?
+                    # IS USED FOR SHAPING THE TENSOR TO TRAIN
+                )
+            else:
+                return image_subsampled_input, image_fullysampled_label
 
             if return_masks:
                 return (
@@ -455,6 +506,7 @@ class data_generator:
 
         else:
             (total_train, num_channels, img_height, img_width, num_slices) = self.train_images.shape
+            (total_valid, num_channels, img_height, img_width, num_slices) = self.valid_images.shape
 
             ########
             ######## RANDOMIZE THE ORDER OF THE TRAIN DATA
@@ -522,7 +574,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=120, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=2, sample_tol=0.5)
             
             mask_2d = sub_mask
 
@@ -540,6 +592,7 @@ class data_generator:
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
+                # TODO: Check and see if I dont need to use permute rather than reshape
                 undersampled_sample = np.multiply(np.reshape(full_kspace[counter, 0, :, :, :], (num_slices, img_height, img_width)), mask_2d)
                 undersampled_kspace[counter, 0, :, :, :] = np.reshape(undersampled_sample, (img_height, img_width, num_slices))
 
@@ -655,7 +708,7 @@ class data_generator:
             num_sampled_pts = np.floor(pdf.sum())
 
             if num_sampled_pts == num_desired_pts:
-                print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
+                # print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
                 break
             if num_sampled_pts > num_desired_pts:  # Infeasible
                 max_offset = check_point
@@ -766,7 +819,7 @@ if __name__ == "__main__":
     def kspace_to_img(kspace):
         return np.abs(fft.ifftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
-    the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
+    the_generator = data_generator(bool_2d=run_2d, logger=logger)  # Default parameters go in here
 
     logger.info('Data generator init complete')
 

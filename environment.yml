@@ -1,4 +1,4 @@
-name: trabecular_bone_project
+name: deep_learning
 channels:
   - defaults
   - conda-forge

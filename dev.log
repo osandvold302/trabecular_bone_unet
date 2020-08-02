@@ -1,0 +1,24 @@
+2020-08-02 16:33:23,446 cnn  INFO Running cnn
+2020-08-02 16:33:23,447 cnn  INFO Building cnn
+2020-08-02 16:33:23,457 data_generator  INFO Initializing data generator
+2020-08-02 16:33:23,457 data_generator  INFO 
+Loading images and kspace . . . 
+
+2020-08-02 16:33:23,457 data_generator  INFO num scans:31
+2020-08-02 16:33:23,665 data_generator WARNING WARNING: Volume contains 60 slices, increasing to 64
+2020-08-02 16:34:11,451 data_generator  INFO 
+Splitting Training And Valid Data . . . 
+
+2020-08-02 16:34:12,753 data_generator  INFO 
+ Returning Dataset Info . . . 
+
+2020-08-02 16:34:13,291 cnn  INFO Input Matrix Shape: (None, 1, 512, 512, 64)
+2020-08-02 16:34:13,294 cnn  INFO Tensor input has shape: (?, 1, 512, 512, 64)
+2020-08-02 16:34:13,992 cnn  INFO Shape of tensor_output: (?, 1, 512, 512, 64)
+2020-08-02 16:34:19,125 cnn  INFO CNN model built. Training network
+2020-08-02 16:34:19,125 cnn  INFO NOW BEGIN TRAINING OF 200 EPOCHS
+2020-08-02 16:34:36,363 data_generator DEBUG kspace full : (3, 1, 512, 512, 64)
+2020-08-02 16:34:36,363 data_generator DEBUG kspace batch mask shape: (3, 1, 512, 512)
+2020-08-02 16:34:39,629 cnn  INFO input_subsample shape: (25, 1, 512, 512, 64)
+2020-08-02 16:34:39,629 cnn  INFO batch_label shape: (25, 1, 512, 512, 64)
+2020-08-02 16:34:39,629 cnn  INFO kspace shape: (3, 1, 512, 512, 64)

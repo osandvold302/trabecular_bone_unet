@@ -25,7 +25,8 @@ import tqdm
 import os
 import glob
 from tensorflow.keras.layers import Lambda
-
+import argparse
+import logging
 
 #############
 #############
@@ -39,18 +40,30 @@ import model_architectures
 from data_loader_class import data_generator
 from show_3d_images import show_3d_images
 
+def get_logger(name):
+    log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
+    logging.basicConfig(level=logging.DEBUG,format=log_format,
+                        filename='dev.log',
+                        filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(logging.Formatter(log_format))
+    logging.getLogger(name).addHandler(console)
+    logging.basicConfig(filename='LOGFILE.log',filemode='w')
+
+    return logging.getLogger(name)
 
 class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
-        bool_2d=True, 
         #project_folder,
         batch_size,
         max_epoch,
         model_name,
+        logger,
+        bool_2d=True, 
         learn_rate=1e-3,
-        is_image_space=True,
         acceleration_factor=4,
         polyfit_order=3,
         *layerinfo
@@ -69,6 +82,11 @@ class CNN:
             Outputs:
                 image = CNN-processed image 
             """
+        if not logger:
+            self.logger = get_logger('cnn')
+            self.logger.info('CNN initialization')
+        else:
+            self.logger = logger
 
         tf.logging.set_verbosity(tf.logging.ERROR)
         tf.set_random_seed(seed=1)
@@ -88,7 +106,6 @@ class CNN:
         self.img_height = 512
         self.img_width = 512
 
-        self.is_image_space = is_image_space
         self.acceleration_factor = acceleration_factor
         self.dtype = tf.float32
 
@@ -97,48 +114,35 @@ class CNN:
 
         self.bool_2d = bool_2d
 
-        '''
-        if os.path.isdir("E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"):
-            self.study_dir = "E:\\ENM_Project\\SPGR_AF2_242_242_1500_um\\"
-
-            if self.is_image_space:
-                self.project_folder = project_folder + "Saved_Models\\ImageSpace\\"
-                self.save_dir = self.project_folder + self.model_name + "\\"
-            else:
-                self.project_folder = project_folder + "Saved_Models\\KSpace\\"
-                self.save_dir = self.project_folder + self.model_name + "\\"
-
-        elif os.path.isdir("/run/media/bellowz"):
-            self.study_dir = (
-                "/run/media/bellowz/S*/ENM_Project/SPGR_AF2_242_242_1500_um/"
-            )
-            if self.is_image_space:
-                self.project_folder = project_folder + "Saved_Models/ImageSpace/"
-                self.save_dir = self.project_folder + self.model_name + "/"
-            else:
-                self.project_folder = project_folder + "Saved_Models/KSpace/"
-                self.save_dir = self.project_folder + self.model_name + "/"
-
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
-        '''
-
         self.my_gen = data_generator(
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
             poly_distance_order=polyfit_order,
-            bool_2d=self.bool_2d
+            bool_2d=self.bool_2d,
         )
 
-        (
-            self.num_train,
-            self.num_valid,
-            self.num_channels,
-            self.img_height,
-            self.img_width,
-            _,
-            _,
-        ) = self.my_gen.get_info()
+        if self.bool_2d:
+            (
+                self.num_train,
+                self.num_valid,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                _,
+                _,
+            ) = self.my_gen.get_info()
+        else:
+            (
+                self.num_train,
+                self.num_valid,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                self.num_slices,
+                _,
+                _
+            ) = self.my_gen.get_info()
+            
 
         real_imag_dim = 2
 
@@ -150,39 +154,29 @@ class CNN:
         self.sess = tf.Session(config=config_options)
         # Define the Tensorflow Session
 
-        if self.is_image_space:
+        # ####
+        # #### IMAGE SPACE - 4 DIMENSIONS:
+        # ####
+        # Batch_dim is set to None so it can be modified later on
+        # Num_channels should be size 1
 
-            # ####
-            # #### IMAGE SPACE - 4 DIMENSIONS:
-            # ####
-            # Batch_dim is set to None so it can be modified later on
-            # Num_channels should be size 1
-
+        if self.bool_2d:
             self.input_matrix_shape = (
                 None,
                 self.num_channels,
                 self.img_height,
                 self.img_width,
             )
-
         else:
+            self.input_matrix_shape = (
+                None,
+                self.num_channels,
+                self.img_height,
+                self.img_width,
+                self.num_slices
+          )
 
-            ####
-            #### IMAGE SPACE - 5 DIMENSIONS:
-            ####
-            # Extra 2 dimensions are for Real and Imag
-
-            # NOTE: THIS IS FOR 3D MODEL
-            # self.input_matrix_shape = (
-            #     None,
-            #     self.num_channels,
-            #     2,
-            #     self.img_height,
-            #     self.img_width,
-            # )
-
-            # NOTE: THIS IS FOR 2D MODEL
-            self.input_matrix_shape = (None, 2, self.img_height, self.img_width)
+        self.logger.info("Input Matrix Shape: " + str(self.input_matrix_shape))
 
         self.input_subsampled_placeholder = tf.placeholder(
             dtype=self.dtype, shape=self.input_matrix_shape
@@ -200,26 +194,11 @@ class CNN:
             dtype=self.dtype, shape=self.input_matrix_shape
         )
 
-        # self.loss = tf.losses.mean_squared_error(
-        #     labels=self.label_fullysampled_placeholder,
-        #     predictions=self.output_predicted_placeholder,
-        # )
-
-        if self.is_image_space:
-
-            self.loss = self.custom_image_loss(
-                y_true=self.label_fullysampled_placeholder,
-                y_pred=self.output_predicted_placeholder,
-                kspace_mask=self.kspace_mask_placeholder,
-            )
-
-        else:
-
-            self.loss = self.custom_kspace_loss(
-                y_true=self.label_fullysampled_placeholder,
-                y_pred=self.output_predicted_placeholder,
-                not_kspace_mask=self.kspace_mask_placeholder,
-            )
+        self.loss = self.custom_image_loss(
+            y_true=self.label_fullysampled_placeholder,
+            y_pred=self.output_predicted_placeholder,
+            kspace_mask=self.kspace_mask_placeholder,
+        )
 
         self.optimizer_type = tf.train.AdamOptimizer(learning_rate=self.learn_rate)
 
@@ -248,32 +227,13 @@ class CNN:
         # else:
         #     casted = False
 
-        if self.is_image_space:
+        self.logger.info('Tensor input has shape: ' + str(tensor_input.shape))
 
+        if self.bool_2d:
             tensor_output = model_architectures.unet_9_layers(tensor_input)
-
         else:
-
-            # tensor_output_unscaled = model_architectures.unet_9_layers(tensor_input,output_tensor_channels=2)
-
-            # tensor_output_real = Lambda( lambda tensor_output_unscaled: tensor_output_unscaled[:,0,:,:])(tensor_output_unscaled)
-            # tensor_output_imag = Lambda( lambda tensor_output_unscaled: tensor_output_unscaled[:,1,:,:])(tensor_output_unscaled)
-
-            # tensor_output_real = tensor_output_real*self.kspace_std[0]+self.kspace_mean[0]
-            # tensor_output_imag = tensor_output_imag*self.kspace_std[1]+self.kspace_mean[1]
-
-            # print(tensor_output_imag.shape)
-            # print(tensor_output_real.shape)
-            # print('\n\n\n')
-
-            # tensor_output = tf.concat([tensor_output_real,tensor_output_imag],axis=1)
-            tensor_output = model_architectures.unet_9_layers(
-                tensor_input, output_tensor_channels=2
-            )
-
-        # if casted:
-        #     input = original_class(input)
-
+            tensor_output = model_architectures.unet_9_layers_3D(tensor_input)
+        self.logger.info("Shape of tensor_output: " + str(tensor_output.shape))
         return tensor_output
 
     def train(self):
@@ -305,7 +265,6 @@ class CNN:
                         where lossoutputs is a numpy.ndarray of the history of loss evaluations
                         and iter is the iteration #
                 """
-
         ##############
         ##############
         ############## REPLACE THIS WITH DATA LOADER HERE
@@ -330,6 +289,8 @@ class CNN:
 
         start_time = timeit.default_timer()
 
+        self.logger.info("NOW BEGIN TRAINING OF {} EPOCHS".format(self.max_epoch))
+
         for epoch_num in range(self.max_epoch):
 
             print("\n\n EPOCH NUMBER " + str(epoch_num + 1))
@@ -344,21 +305,17 @@ class CNN:
                     batch_ind=counter, is_train=True
                 )
 
-                if self.is_image_space:
+                self.logger.info("input_subsample shape: " + str(batch_input_subsampled_train.shape))
+                self.logger.info("batch_label shape: " + str(batch_input_subsampled_train.shape))
+                self.logger.info("kspace shape: " + str(batch_kspace_mask_train.shape))
 
-                    tf_dict_train = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_train,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_train,
-                        self.kspace_mask_placeholder: batch_kspace_mask_train,
-                    }
 
-                else:
 
-                    tf_dict_train = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_train,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_train,
-                        self.kspace_mask_placeholder: batch_kspace_mask_train,
-                    }
+                tf_dict_train = {
+                    self.input_subsampled_placeholder: batch_input_subsampled_train,
+                    self.label_fullysampled_placeholder: batch_label_fullysampled_train,
+                    self.kspace_mask_placeholder: batch_kspace_mask_train,
+                }
 
 
                 # Run a forward pass and backpropagation and output the optimizer state and loss value
@@ -392,21 +349,12 @@ class CNN:
                     is_train=False,
                 )
 
-                if self.is_image_space:
 
-                    tf_dict_valid = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_valid,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
-                        self.kspace_mask_placeholder: batch_kspace_mask_valid,
-                    }
-
-                else:
-
-                    tf_dict_valid = {
-                        self.input_subsampled_placeholder: batch_input_subsampled_valid,
-                        self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
-                        self.kspace_mask_placeholder: batch_kspace_mask_valid,
-                    }
+                tf_dict_valid = {
+                    self.input_subsampled_placeholder: batch_input_subsampled_valid,
+                    self.label_fullysampled_placeholder: batch_label_fullysampled_valid,
+                    self.kspace_mask_placeholder: batch_kspace_mask_valid,
+                }
 
                 # Run a forward pass without backpropagation and save loss value
                 valid_batch_loss = self.sess.run(self.loss, tf_dict_valid)
@@ -510,10 +458,7 @@ class CNN:
         # print(x.shape)
         # print('\n\n\n')
 
-        if self.is_image_space:
-            return roll(input=x, shift=shift, axis=[2, 3])
-        else:
-            return roll(input=x, shift=shift, axis=[1, 2])
+        return roll(input=x, shift=shift, axis=[2, 3])
 
     def ifftshift(self, x):
         """
@@ -538,10 +483,7 @@ class CNN:
         # print('\n\n\n')
 
         shift = [-int(x_dim // 2), -int(y_dim // 2)]
-        if self.is_image_space:
-            return roll(input=x, shift=shift, axis=[2, 3])
-        else:
-            return roll(input=x, shift=shift, axis=[1, 2])
+        return roll(input=x, shift=shift, axis=[2, 3])
 
     def kspace_to_image(self, kspace):
 
@@ -626,149 +568,72 @@ class CNN:
             tf.square(tf.abs(kspace_true))
         )
 
-        # # (Batch, channels, height, widhth)
-        # y_true_t = tf.transpose(y_true,perm=[0,2,3,1])
-        # y_pred_t = tf.transpose(y_pred,perm=[0,2,3,1])
-        # # NOW IT IS SIZE BATCH, HEIGHT, WIDTH, NUM_CHANNELS
+        if self.bool_2d:
+            # ## Make conv kernels
 
-        # Range of 0.5-0.001
+            dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
 
-        # ssim = tf.reduce_mean(tf.image.ssim_multiscale(
-        #     img1=y_true,
-        #     img2=y_pred,
-        #     max_val=1
-        #     ))
+            dy_filter = tf.constant(dy_filter_np, dtype=self.dtype, shape=(3, 3, 1, 1))
 
-        # RANGE OF 0.4-0.008
+            dy_true = tf.nn.conv2d(
+                input=y_true,
+                filter=dy_filter,
+                strides=(1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
 
-        # total_variation = tf.reduce_mean(
-        #     tf.image.total_variation(
-        #         images=y_pred)
-        #     )
-        # 4k max
+            dy_pred = tf.nn.conv2d(
+                input=y_pred,
+                filter=dy_filter,
+                strides=(1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCHW",
+            )
 
-        # dy_true,dx_true = tf.image.image_gradients(image=y_true)
-        # dy_pred,dx_pred = tf.image.image_gradients(image=y_pred)
+            # # Compute derivatvies
+            mse_dy = tf.losses.mean_squared_error(labels=dy_true, predictions=dy_pred)
 
-        # #####
-        # #####   X AND Y DERIVATIVES
-        # #####
+            loss = mse + kspace_loss + mse_dy
+        else:
+            '''Fine tuning regularizers is last step
+            gauss_filt_np = np.zeros((3,3,3))
+            gauss_filt_np[:,:,0] = [[6, 10, 6],
+                                  [10, 17, 10],
+                                  [6, 10,6]]
+            gauss_filt_np[:,:,1] = [[10, 17, 10],
+                                  [17, 28, 17],
+                                  [10, 17, 10]]
+            gauss_filt_np[:,:,2] = gauss_filt_np[:,:,0]
 
-        # ## Make conv kernels
+            gauss_filt = tf.constant(gauss_filt_np, dtype=self.dtype, shape=(3,3,3,1,1))
 
-        # dx_filter_np = np.array([
-        #     [-1,-2,-1],
-        #     [0,0,0],
-        #     [1,2,1]])
+            # orignal order = (batch, channels, height, width, depth)
+            y_true_t = tf.transpose(y_true, perm=[0,1,4,2,3])
+            y_pred_t = tf.transpose(y_pred, perm=[0,1,4,2,3])
+            #  [batch, in_channels, in_depth, in_height, in_width]
 
-        dy_filter_np = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+            dy_dz_true = tf.nn.conv3d(
+                input=y_true_t,
+                filter=gauss_filt,
+                strides=(1, 1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCDHW",
+            )
 
-        # dx_filter = tf.constant(dx_filter_np,dtype=self.dtype,shape=(3,3,1,1))
-        dy_filter = tf.constant(dy_filter_np, dtype=self.dtype, shape=(3, 3, 1, 1))
+            dy_dz_pred = tf.nn.conv3d(
+                input=y_pred_t,
+                filter=gauss_filt,
+                strides=(1, 1, 1, 1, 1),
+                padding="VALID",
+                data_format="NCDHW",
+            )
+            
+            # # Compute derivatvies
+            mse_dy_dz = tf.losses.mean_squared_error(labels=dy_dz_true, predictions=dy_dz_pred)
+            '''
+            loss = mse + kspace_loss
 
-        # dx_filter_np = np.array([
-        #     [-1],
-        #     [0],
-        #     [1]])
-
-        # dy_filter_np = np.array([
-        #     [-1,0,1],
-        #     ])
-
-        # dx_filter = tf.constant(dx_filter_np,dtype=self.dtype,shape=(3,1,1,1))
-        # dy_filter = tf.constant(dy_filter_np,dtype=self.dtype,shape=(1,3,1,1))
-
-        # # Apply convs to compute derivatives
-
-        # dx_true = tf.nn.conv2d(
-        #     input=y_true,
-        #     filter=dx_filter,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        dy_true = tf.nn.conv2d(
-            input=y_true,
-            filter=dy_filter,
-            strides=(1, 1, 1, 1),
-            padding="VALID",
-            data_format="NCHW",
-        )
-
-        # dx_pred = tf.nn.conv2d(
-        #     input=y_pred,
-        #     filter=dx_filter,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        dy_pred = tf.nn.conv2d(
-            input=y_pred,
-            filter=dy_filter,
-            strides=(1, 1, 1, 1),
-            padding="VALID",
-            data_format="NCHW",
-        )
-
-        # # Compute derivatvies
-        mse_dy = tf.losses.mean_squared_error(labels=dy_true, predictions=dy_pred)
-        # # Range of 0.5-0.001
-
-        # mse_dx = tf.losses.mean_squared_error(
-        #     labels=dx_true,
-        #     predictions=dx_pred)
-
-        ## LAPLACIAN LOSS
-
-        # MSE DY + DX is 0.0069
-
-        # Central difference operator:
-        # [-1 0 1]
-        # OR SOBEL
-        # [ -1 -2 -1
-        # 0 0 0
-        # 1 2 1]
-
-        # laplacian_filter_np = np.array([
-        #     [-1,-1,-1],
-        #     [-1,8,-1],
-        #     [-1,-1,-1]])
-
-        # laplacian_filter_np = np.array([
-        #     [0,-1,0],
-        #     [-1,4,-1],
-        #     [0,-1,0]])
-
-        # # # NOTE: Conv2d takes input of (filter_height,filter_width,in_channels,out_channels)
-
-        # lap_filt = tf.constant(laplacian_filter_np,dtype=self.dtype,shape=(3,3,1,1))
-
-        # lap_true = tf.nn.conv2d(
-        #     input=y_true,
-        #     filter=lap_filt,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        # lap_pred = tf.nn.conv2d(
-        #     input=y_pred,
-        #     filter=lap_filt,
-        #     strides=(1,1,1,1),
-        #     padding="VALID",
-        #     data_format='NCHW')
-
-        # mse_lap = tf.losses.mean_squared_error(
-        #     labels=lap_true,
-        #     predictions=lap_pred)
-        # Max of around 0.5
-
-        # psnr = tf.reduce_mean(tf.image.psnr(
-        #     a=y_true,
-        #     b=y_pred,
-        #     max_val=1))
-        # Max of 12
-
-        loss = mse + kspace_loss + mse_dy
         return loss
 
 
@@ -777,6 +642,9 @@ def main():
         Tests the CNN.
 
     """
+    logger = get_logger('cnn')
+    logger.info('Running cnn')
+ 
     parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
     parser.add_argument('--2d', dest='run_2d', action='store_true')
     parser.add_argument('--3d', dest='run_2d', action='store_false')
@@ -797,7 +665,7 @@ def main():
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
-    batch_size = 10
+    batch_size = 3
     acc_factor = 2
     max_epoch = 200
     polyfit = 4
@@ -808,17 +676,20 @@ def main():
         str(batch_size), str(acc_factor), str(max_epoch), str(polyfit), str(lr)
     )
 
+    logger.info('Building cnn')
+
     convnet = CNN(
+        logger=logger,
         bool_2d=run_2d,
-        #project_folder=project_folder,
         batch_size=batch_size,
         max_epoch=max_epoch,
         model_name=name,
         learn_rate=lr,
-        is_image_space=True,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
     )
+
+    logger.info('CNN model built. Training network')
 
     convnet.train()
 
