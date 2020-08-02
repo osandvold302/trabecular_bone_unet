@@ -97,7 +97,7 @@ class data_generator:
         study_dir = '/d1/hip/DL/SPGR_AF2_242_242_1500_um/'
 
         # scan_fils = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "2012*/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "2013*/data/dataFile.mat")
         
         # Used for cluster
         #scan_files = glob.glob(study_dir + "12*dataFile.mat")
@@ -361,11 +361,11 @@ class data_generator:
             ####
 
             image_fullysampled_label = np.zeros(
-                self.train_images.shape 
+                self.train_images.shape
             )
 
             image_subsampled_input = np.zeros(
-               self.train_images.shape 
+                self.train_images.shape
             )
 
             for counter in range(batch_dim):
@@ -412,6 +412,8 @@ class data_generator:
                 full_kspace=kspace_batch_full
             )
 
+            print("kspace full : " + str(kspace_batch_full.shape))
+            print("kspace batch mask shape: "+ str(kspace_batch_mask.shape))
             (batch_dim, channel_dim, height_dim, width_dim, num_slices) = kspace_batch_full.shape
 
             ####
@@ -438,7 +440,8 @@ class data_generator:
                 return (
                     image_subsampled_input,
                     image_fullysampled_label,
-                    kspace_batch_mask,
+                    kspace_batch_subsampled # TODO: IS THIS CORRECT?
+                    # IS USED FOR SHAPING THE TENSOR TO TRAIN
                 )
             else:
                 return image_subsampled_input, image_fullysampled_label
@@ -559,7 +562,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=100, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=2, sample_tol=0.5)
             
             mask_2d = sub_mask
 
@@ -577,6 +580,7 @@ class data_generator:
                 undersampled_slice = np.multiply(full_kspace[counter, 0, :, :], mask_2d)
                 undersampled_kspace[counter, 0, :, :] = undersampled_slice
             else:
+                # TODO: Check and see if I dont need to use permute rather than reshape
                 undersampled_sample = np.multiply(np.reshape(full_kspace[counter, 0, :, :, :], (num_slices, img_height, img_width)), mask_2d)
                 undersampled_kspace[counter, 0, :, :, :] = np.reshape(undersampled_sample, (img_height, img_width, num_slices))
 
