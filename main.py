@@ -118,7 +118,8 @@ class CNN:
             batch_size=self.batch_size,
             acceleration_factor=self.acceleration_factor,
             poly_distance_order=polyfit_order,
-            bool_2d=self.bool_2d
+            bool_2d=self.bool_2d,
+            logger=self.logger
         )
 
         if self.bool_2d:

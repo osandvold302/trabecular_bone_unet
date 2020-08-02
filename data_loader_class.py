@@ -51,7 +51,8 @@ def get_logger(name):
 
 class data_generator:
     def __init__(
-        self,
+        iself,
+        logger,
         #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
         study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
@@ -67,6 +68,12 @@ class data_generator:
     ):
 
         super(data_generator, self).__init__()
+
+        if not logger:
+            self.logger = get_logger('data_generator')
+            self.logger.info('Initializing data generator')
+        else:
+            self.logger = logger
 
         self.study_dir = study_dir
 
@@ -89,7 +96,7 @@ class data_generator:
 
 
     def load_data(self):
-        print("\nLoading images and kspace . . . \n")
+        self.logger.info("\nLoading images and kspace . . . \n")
 
         study_dir = self.study_dir
         
@@ -119,7 +126,7 @@ class data_generator:
             scan_name_list.append(scan_name)
 
         num_scans = len(scan_files)
-        print("num scans:" + str(num_scans))
+        self.logger.info("num scans:" + str(num_scans))
 
         # NOTE: ONCE AGAIN, MAJOR ASSUMPTION THAT ALL DATA IS SAME SIZE
         # SO SORRY THIS IS GROSS
@@ -157,7 +164,7 @@ class data_generator:
                     # NOTE: sample study has 60 slices, dupe first and last
                     # slices to ensure 64 slices total
                     if num_slices != 64:
-                        print('WARNING: Volume contains 60 slices, increasing to 64')
+                        self.logger.warning('WARNING: Volume contains 60 slices, increasing to 64')
                         num_slices = 64
                         slices_power_of_2 = False
 
@@ -197,7 +204,7 @@ class data_generator:
         return img_stack, kspace_stack, scan_name_list
 
     def split_train_and_valid(self, images, kspace, names_list):
-        print("\nSplitting Training And Valid Data . . . \n")
+        self.logger.info("\nSplitting Training And Valid Data . . . \n")
 
         total_images = len(names_list) # assumption that names = total num
         num_valid = np.round(self.valid_ratio * total_images).astype(np.int16)
@@ -257,7 +264,7 @@ class data_generator:
 
 
     def get_batch(self):
-        print("\n Getting batch . . . \n")
+        self.logger.info("\n Getting batch . . . \n")
 
         if self.is_2d:
 
@@ -277,7 +284,7 @@ class data_generator:
             )
 
     def get_info(self):
-        print("\n Returning Dataset Info . . . \n")
+        self.logger.info("\n Returning Dataset Info . . . \n")
         num_train = num_channels = img_height = img_width = num_slices = 0
 
         if self.is_2d:
@@ -412,8 +419,8 @@ class data_generator:
                 full_kspace=kspace_batch_full
             )
 
-            print("kspace full : " + str(kspace_batch_full.shape))
-            print("kspace batch mask shape: "+ str(kspace_batch_mask.shape))
+            self.logger.debug("kspace full : " + str(kspace_batch_full.shape))
+            self.logger.debug("kspace batch mask shape: "+ str(kspace_batch_mask.shape))
             (batch_dim, channel_dim, height_dim, width_dim, num_slices) = kspace_batch_full.shape
 
             ####
@@ -696,7 +703,7 @@ class data_generator:
             num_sampled_pts = np.floor(pdf.sum())
 
             if num_sampled_pts == num_desired_pts:
-                print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
+                # print("PDF CONVERGED ON ITERATION " + str(iter_num) + "\n\n")
                 break
             if num_sampled_pts > num_desired_pts:  # Infeasible
                 max_offset = check_point
@@ -733,9 +740,6 @@ class data_generator:
         # Initialize output case it doesnt converge
 
         for counter in range(max_iter):
-
-            if counter%25 == 0:
-              print('Calculating mask #' + str(counter))
 
             candidate_mask = np.zeros(pdf.shape)
             # Create new candidate sampling mask
@@ -810,7 +814,7 @@ if __name__ == "__main__":
     def kspace_to_img(kspace):
         return np.abs(fft.ifftshift(fft.ifftn(fft.fftshift(kspace)))).astype(np.double)
 
-    the_generator = data_generator(bool_2d=run_2d)  # Default parameters go in here
+    the_generator = data_generator(bool_2d=run_2d, logger=logger)  # Default parameters go in here
 
     logger.info('Data generator init complete')
 
