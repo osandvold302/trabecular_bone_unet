@@ -84,7 +84,7 @@ class CNN:
             """
         if not logger:
             self.logger = get_logger('cnn')
-            logger.info('CNN initialization')
+            self.logger.info('CNN initialization')
         else:
             self.logger = logger
 
@@ -119,7 +119,6 @@ class CNN:
             acceleration_factor=self.acceleration_factor,
             poly_distance_order=polyfit_order,
             bool_2d=self.bool_2d,
-            logger=self.logger
         )
 
         if self.bool_2d:
@@ -666,7 +665,7 @@ def main():
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
-    batch_size = 10
+    batch_size = 3
     acc_factor = 2
     max_epoch = 200
     polyfit = 4
@@ -680,6 +679,7 @@ def main():
     logger.info('Building cnn')
 
     convnet = CNN(
+        logger=logger,
         bool_2d=run_2d,
         batch_size=batch_size,
         max_epoch=max_epoch,
@@ -687,7 +687,6 @@ def main():
         learn_rate=lr,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
-        logger=logger
     )
 
     logger.info('CNN model built. Training network')

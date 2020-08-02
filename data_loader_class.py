@@ -51,8 +51,8 @@ def get_logger(name):
 
 class data_generator:
     def __init__(
-        iself,
-        logger,
+        self,
+        logger='unset',
         #study_dir="/d1/hip/DL/SPGR_AF2_242_242_1500_um/", # on LSNI2
         study_dir="./SPGR_AF2_242_242_1500_um/",
         valid_ratio=0.2,  # Percent of total data that is validation. Train is 1-Ratio
@@ -69,7 +69,7 @@ class data_generator:
 
         super(data_generator, self).__init__()
 
-        if not logger:
+        if logger=='unset':
             self.logger = get_logger('data_generator')
             self.logger.info('Initializing data generator')
         else:
