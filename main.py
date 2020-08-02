@@ -26,7 +26,7 @@ import os
 import glob
 from tensorflow.keras.layers import Lambda
 import argparse
-
+import logging
 
 #############
 #############
@@ -40,6 +40,18 @@ import model_architectures
 from data_loader_class import data_generator
 from show_3d_images import show_3d_images
 
+def get_logger(name):
+    log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
+    logging.basicConfig(level=logging.DEBUG,format=log_format,
+                        filename='dev.log',
+                        filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(logging.Formatter(log_format))
+    logging.getLogger(name).addHandler(console)
+    logging.basicConfig(filename='LOGFILE.log',filemode='w')
+
+    return logging.getLogger(name)
 
 class CNN:
     # class CNN(tf.Module):
@@ -49,6 +61,7 @@ class CNN:
         batch_size,
         max_epoch,
         model_name,
+        logger,
         bool_2d=True, 
         learn_rate=1e-3,
         acceleration_factor=4,
@@ -69,6 +82,11 @@ class CNN:
             Outputs:
                 image = CNN-processed image 
             """
+        if not logger:
+            self.logger = get_logger('cnn')
+            logger.info('CNN initialization')
+        else:
+            self.logger = logger
 
         tf.logging.set_verbosity(tf.logging.ERROR)
         tf.set_random_seed(seed=1)
@@ -158,6 +176,8 @@ class CNN:
                 self.num_slices
           )
 
+        self.logger.info("Input Matrix Shape: " + str(self.input_matrix_shape))
+
         self.input_subsampled_placeholder = tf.placeholder(
             dtype=self.dtype, shape=self.input_matrix_shape
         )
@@ -207,11 +227,13 @@ class CNN:
         # else:
         #     casted = False
 
+        self.logger.info('Tensor input has shape: ' + str(tensor_input.shape))
+
         if self.bool_2d:
             tensor_output = model_architectures.unet_9_layers(tensor_input)
         else:
-            tensor_output = model_architectures.unet_7_layers_3D(tensor_input)
-
+            tensor_output = model_architectures.unet_9_layers_3D(tensor_input)
+        self.logger.info("Shape of tensor_output: " + str(tensor_output.shape))
         return tensor_output
 
     def train(self):
@@ -243,7 +265,6 @@ class CNN:
                         where lossoutputs is a numpy.ndarray of the history of loss evaluations
                         and iter is the iteration #
                 """
-
         ##############
         ##############
         ############## REPLACE THIS WITH DATA LOADER HERE
@@ -268,6 +289,8 @@ class CNN:
 
         start_time = timeit.default_timer()
 
+        self.logger.info("NOW BEGIN TRAINING OF {} EPOCHS".format(self.max_epoch))
+
         for epoch_num in range(self.max_epoch):
 
             print("\n\n EPOCH NUMBER " + str(epoch_num + 1))
@@ -281,6 +304,11 @@ class CNN:
                 batch_input_subsampled_train, batch_label_fullysampled_train, batch_kspace_mask_train = self.my_gen.generator(
                     batch_ind=counter, is_train=True
                 )
+
+                self.logger.info("input_subsample shape: " + str(batch_input_subsampled_train.shape))
+                self.logger.info("batch_label shape: " + str(batch_input_subsampled_train.shape))
+                self.logger.info("kspace shape: " + str(batch_kspace_mask_train.shape))
+
 
 
                 tf_dict_train = {
@@ -568,7 +596,7 @@ class CNN:
 
             loss = mse + kspace_loss + mse_dy
         else:
-            # TODO: get some sort of filter here--gauss?
+            '''Fine tuning regularizers is last step
             gauss_filt_np = np.zeros((3,3,3))
             gauss_filt_np[:,:,0] = [[6, 10, 6],
                                   [10, 17, 10],
@@ -603,9 +631,9 @@ class CNN:
             
             # # Compute derivatvies
             mse_dy_dz = tf.losses.mean_squared_error(labels=dy_dz_true, predictions=dy_dz_pred)
+            '''
+            loss = mse + kspace_loss
 
-            loss = mse + kspace_loss + mse_dy_dz
-        
         return loss
 
 
@@ -614,6 +642,9 @@ def main():
         Tests the CNN.
 
     """
+    logger = get_logger('cnn')
+    logger.info('Running cnn')
+ 
     parser = argparse.ArgumentParser(description='Please specify if you would like to use the center 2D slice or whole 3D volume for each scan')
     parser.add_argument('--2d', dest='run_2d', action='store_true')
     parser.add_argument('--3d', dest='run_2d', action='store_false')
@@ -645,6 +676,8 @@ def main():
         str(batch_size), str(acc_factor), str(max_epoch), str(polyfit), str(lr)
     )
 
+    logger.info('Building cnn')
+
     convnet = CNN(
         bool_2d=run_2d,
         batch_size=batch_size,
@@ -653,7 +686,10 @@ def main():
         learn_rate=lr,
         acceleration_factor=acc_factor,
         polyfit_order=polyfit,
+        logger=logger
     )
+
+    logger.info('CNN model built. Training network')
 
     convnet.train()
 
