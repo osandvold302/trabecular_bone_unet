@@ -232,7 +232,7 @@ class CNN:
         if self.bool_2d:
             tensor_output = model_architectures.unet_9_layers(tensor_input)
         else:
-            tensor_output = model_architectures.unet_9_layers_3D(tensor_input)
+            tensor_output = model_architectures.unet_7_layers_3D(tensor_input)
         self.logger.info("Shape of tensor_output: " + str(tensor_output.shape))
         return tensor_output
 
@@ -298,7 +298,7 @@ class CNN:
             train_batch_loss = []
             valid_batch_loss = []
 
-            # for counter in range(steps_per_epoch_train):
+
             for counter in tqdm.tqdm(range(steps_per_epoch_train)):
 
                 batch_input_subsampled_train, batch_label_fullysampled_train, batch_kspace_mask_train = self.my_gen.generator(
@@ -556,7 +556,8 @@ class CNN:
         #
 
         mse = tf.losses.mean_squared_error(labels=y_true, predictions=y_pred)
-
+        
+        '''DEBUG: Removing kspace mse for now
         kspace_true = self.image_to_kspace(image=y_true)
         kspace_pred = self.image_to_kspace(image=y_pred)
 
@@ -567,6 +568,7 @@ class CNN:
         kspace_loss = tf.reduce_mean(tf.square(kspace_loss)) / tf.reduce_mean(
             tf.square(tf.abs(kspace_true))
         )
+        '''
 
         if self.bool_2d:
             # ## Make conv kernels
@@ -632,7 +634,7 @@ class CNN:
             # # Compute derivatvies
             mse_dy_dz = tf.losses.mean_squared_error(labels=dy_dz_true, predictions=dy_dz_pred)
             '''
-            loss = mse + kspace_loss
+            loss = mse # + kspace_loss -- DEBUG: will add back if working
 
         return loss
 
@@ -665,7 +667,7 @@ def main():
     # output_folder = "b{}_e{}_se_{}_vs_{}".format(str(batch_size),str(epochs),
     #                                    str(steps_per_epoch),str(validation_steps))
 
-    batch_size = 3
+    batch_size = 1
     acc_factor = 2
     max_epoch = 200
     polyfit = 4
