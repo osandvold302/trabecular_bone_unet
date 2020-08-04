@@ -104,7 +104,7 @@ class data_generator:
         study_dir = '/d1/hip/DL/SPGR_AF2_242_242_1500_um/'
 
         # scan_fils = glob.glob(study_dir + "*\\data\\dataFile.mat")
-        scan_files = glob.glob(study_dir + "2013*/data/dataFile.mat")
+        scan_files = glob.glob(study_dir + "2014*/data/dataFile.mat")
         
         # Used for cluster
         #scan_files = glob.glob(study_dir + "12*dataFile.mat")
@@ -368,7 +368,8 @@ class data_generator:
             ####
 
             image_fullysampled_label = np.zeros(
-                self.train_images.shape 
+                self.train_images.shape
+            )
 
             image_subsampled_input = np.zeros(
                 self.train_images.shape
@@ -417,8 +418,6 @@ class data_generator:
                 full_kspace=kspace_batch_full
             )
 
-            self.logger.debug("kspace full : " + str(kspace_batch_full.shape))
-            self.logger.debug("kspace batch mask shape: "+ str(kspace_batch_mask.shape))
             (batch_dim, channel_dim, height_dim, width_dim, num_slices) = kspace_batch_full.shape
 
             ####
@@ -426,13 +425,13 @@ class data_generator:
             ####
 
             image_fullysampled_label = np.zeros(
-                self.train_images.shape 
+                kspace_batch_full.shape
             )
 
             image_subsampled_input = np.zeros(
-               self.train_images.shape 
+                kspace_batch_full.shape
             )
-
+            
             for counter in range(batch_dim):
                 image_fullysampled_label[counter, :, :, :, :] = self.kspace_to_img(
                     kspace_batch_full[counter, 0, :, :, :]
@@ -445,17 +444,8 @@ class data_generator:
                 return (
                     image_subsampled_input,
                     image_fullysampled_label,
-                    kspace_batch_subsampled # TODO: IS THIS CORRECT?
-                    # IS USED FOR SHAPING THE TENSOR TO TRAIN
+                    kspace_batch_subsampled
                 )
-            else:
-                return image_subsampled_input, image_fullysampled_label
-
-            if return_masks:
-                return (
-                    image_subsampled_input,
-                    image_fullysampled_label,
-                    kspace_batch_mask,
             else:
                 return image_subsampled_input, image_fullysampled_label
 
@@ -574,7 +564,7 @@ class data_generator:
                 dist_penalty=distance_penalty,
                 radius=center_maintained,
             )
-            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=2, sample_tol=0.5)
+            (sub_mask, sf) = gen_sampling_mask(pdf, max_iter=30, sample_tol=0.5)
             
             mask_2d = sub_mask
 
