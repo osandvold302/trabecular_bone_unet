@@ -33,6 +33,20 @@ from tensorflow.keras.layers import UpSampling3D
 import os
 import numpy as np
 import tensorflow as tf
+import logging
+
+def get_logger(name):
+    log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
+    logging.basicConfig(level=logging.DEBUG,format=log_format,
+                        filename='dev.log',
+                        filemode='w')
+    console = logging.StreamHandler()
+    console.setLevel(logging.DEBUG)
+    console.setFormatter(logging.Formatter(log_format))
+    logging.getLogger(name).addHandler(console)
+    logging.basicConfig(filename='LOGFILE.log',filemode='w')
+
+    return logging.getLogger(name)
 
 # def conv_block_simple_3d(prevlayer, num_filters, prefix, kernel_size=(2,3,3),initializer="he_normal", strides=(1, 1, 1)):
 def conv_block_simple_3d(prevlayer, num_filters, prefix, kernel_size=(2,3,3),initializer="glorot_normal", strides=(1, 1, 1)):
@@ -63,9 +77,8 @@ def conv_block_simple_3d_no_bn(prevlayer, num_filters, prefix, kernel_size=(3,3,
     return conv
 
 
-
 def unet_7_layers_3D(input_tensor):
-
+    logger = get_logger('model_architectures')
 
     # print('INPUT IMAGE SHAPE')
     # print(input_tensor.shape)
@@ -79,9 +92,10 @@ def unet_7_layers_3D(input_tensor):
     kern=(2,3,3)
     
     # filt=(32,64,128,256,512)
-    filt=(32,64,128,256)
+    filt=(16,32,64,128,256)
     # filt=(64,128,256,512,1024)
-
+ 
+    logger.info("INPUT TENSOR SIZE: " + str(input_tensor.shape))
     conv1 = conv_block_simple_3d(prevlayer=input_tensor, num_filters=filt[0], prefix="conv1",kernel_size=kern)
     conv1 = conv_block_simple_3d(prevlayer=conv1, num_filters=filt[0], prefix="conv1_1",kernel_size=kern)
     pool1 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
@@ -98,12 +112,9 @@ def unet_7_layers_3D(input_tensor):
     pool3 = MaxPooling3D(pool_size=mp_param,strides=stride_param,
         padding="same",data_format="channels_first",name="pool3")(conv3)
 
-
-
     conv4 = conv_block_simple_3d(prevlayer=pool3, num_filters=filt[3], prefix="conv_4",kernel_size=kern)
     conv4 = conv_block_simple_3d(prevlayer=conv4, num_filters=filt[3], prefix="conv_4_1",kernel_size=kern)
     conv4 = conv_block_simple_3d(prevlayer=conv4, num_filters=filt[3], prefix="conv_4_2",kernel_size=kern)
-
 
 
     up5 = Conv3DTranspose(filters=filt[2],kernel_size=kern,strides=(1,2,2),padding="same",data_format="channels_first")(conv4)
@@ -113,8 +124,7 @@ def unet_7_layers_3D(input_tensor):
     conv5 = conv_block_simple_3d(prevlayer=up5, num_filters=filt[2], prefix="conv5_1")
     conv5 = conv_block_simple_3d(prevlayer=conv5, num_filters=filt[2], prefix="conv5_2")
 
-
-    up6 = Conv3DTranspose(filters=filt[1],kernel_size=kern,strides=(1,2,2),padding="same",data_format="channels_first")(conv5)
+    up6 = Conv3DTranspose(filters=filt[1],kernel_size=kern,strides=(1,2,2),padding="same",data_format="channels_first")(conv3)
 
 
     up6 = concatenate([up6, conv2], axis=1)
