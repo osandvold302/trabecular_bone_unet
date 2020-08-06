@@ -23,10 +23,12 @@ import timeit
 from tensorflow.python import roll
 import tqdm
 import os
+import sys
 import glob
 from tensorflow.keras.layers import Lambda
 import argparse
 import logging
+from datetime import datetime, timezone
 
 #############
 #############
@@ -40,10 +42,15 @@ import model_architectures
 from data_loader_class import data_generator
 from show_3d_images import show_3d_images
 
+def get_datetime():
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S")
+
 def get_logger(name):
+    filename = 'dev_' + get_datetime() + '.log'
     log_format = "%(asctime)s %(name)s %(levelname)5s %(message)s"
     logging.basicConfig(level=logging.DEBUG,format=log_format,
-                        filename='dev.log',
+                        filename=filename,
                         filemode='w')
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
@@ -57,6 +64,7 @@ class CNN:
     # class CNN(tf.Module):
     def __init__(
         self,
+        save_dir,
         #project_folder,
         batch_size,
         max_epoch,
@@ -92,6 +100,7 @@ class CNN:
         tf.set_random_seed(seed=1)
 
         #self.project_folder = project_folder
+        self.save_dir = save_dir
 
         self.layerinfo = layerinfo
         self.training_loss = []
@@ -279,7 +288,9 @@ class CNN:
         # Define the image generator
         # NOTE: MOve this to the init once its done
         # TODO: save the model when you're confident lol
-        # save_str = self.save_dir + self.model_name
+        save_str = ''
+        if self.save_dir != '':
+            save_str = self.save_dir + self.model_name
 
         steps_per_epoch_train = int(np.ceil(self.num_train / self.batch_size))
         steps_per_epoch_valid = int(np.ceil(self.num_valid / self.batch_size))
@@ -293,7 +304,7 @@ class CNN:
 
         for epoch_num in range(self.max_epoch):
 
-            print("\n\n EPOCH NUMBER " + str(epoch_num + 1))
+            self.logger.info("\n\n EPOCH NUMBER " + str(epoch_num + 1))
 
             train_batch_loss = []
             valid_batch_loss = []
@@ -304,12 +315,6 @@ class CNN:
                 batch_input_subsampled_train, batch_label_fullysampled_train, batch_kspace_mask_train = self.my_gen.generator(
                     batch_ind=counter, is_train=True
                 )
-
-                self.logger.info("input_subsample shape: " + str(batch_input_subsampled_train.shape))
-                self.logger.info("batch_label shape: " + str(batch_input_subsampled_train.shape))
-                self.logger.info("kspace shape: " + str(batch_kspace_mask_train.shape))
-
-
 
                 tf_dict_train = {
                     self.input_subsampled_placeholder: batch_input_subsampled_train,
@@ -329,7 +334,7 @@ class CNN:
 
             elapsed = timeit.default_timer() - start_time
 
-            print(
+            self.logger.info(
                 "TRAIN ==> Epoch [%d/%d], Loss: %.12f, Time: %2fs"
                 % (epoch_num + 1, self.max_epoch, training_loss_value, elapsed)
             )
@@ -365,7 +370,7 @@ class CNN:
 
             elapsed = timeit.default_timer() - start_time
 
-            print(
+            self.logger.info(
                 "VALID ==> Epoch [%d/%d], Loss: %.12f, Time: %2fs"
                 % (epoch_num + 1, self.max_epoch, valid_batch_loss, elapsed)
             )
@@ -373,12 +378,12 @@ class CNN:
 
             valid_epoch_loss.append(valid_batch_loss)
 
-            if (epoch_num + 1) % 100 == 0:
-                print("SAVING MODEL . . . ")
-                # TODO: Save model in future
-                #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
-        # TODO: save the model
-        #self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+            if save_str != '':
+                if (epoch_num + 1) % 100 == 0:
+                    self.logger.info("SAVING MODEL . . . ")
+                    self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
+        if save_str != '':
+            self.saver.save(self.sess, save_str, global_step=epoch_num + 1)
 
     def load(self):
 
@@ -651,8 +656,23 @@ def main():
     parser.add_argument('--2d', dest='run_2d', action='store_true')
     parser.add_argument('--3d', dest='run_2d', action='store_false')
     parser.set_defaults(run_2d=True)
+    parser.add_argument('-d', '--save_dir', help='Relative directory for model directory')
 
     args = parser.parse_args()
+
+    save_dir = ''
+    if not args.save_dir:
+        logger.warning('No save directory listed for models. Will not save models')
+    else: 
+        save_dir = os.path.join(os.getcwd(), args.save_dir)
+
+        if not os.path.exists(save_dir):
+            logger.warning('Save directory does not exist, attempt to create')
+            try:
+                os.makedirs(save_dir)
+            except OSError as err:
+                logger.error('Cannot create save directory, exiting')
+                sys.exit(1)
 
     run_2d = args.run_2d
 
@@ -685,6 +705,7 @@ def main():
         bool_2d=run_2d,
         batch_size=batch_size,
         max_epoch=max_epoch,
+        save_dir=save_dir,
         model_name=name,
         learn_rate=lr,
         acceleration_factor=acc_factor,
