@@ -2,3 +2,4 @@ dev.log
 __pycache__/*
 output.txt
 nohup.out
+dev*.log
