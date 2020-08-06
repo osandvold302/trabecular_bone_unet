@@ -92,7 +92,7 @@ def unet_7_layers_3D(input_tensor):
     kern=(2,3,3)
     
     # filt=(32,64,128,256,512)
-    filt=(16,32,64,128,256)
+    filt=(16,32,32,64,128,256)
     # filt=(64,128,256,512,1024)
  
     logger.info("INPUT TENSOR SIZE: " + str(input_tensor.shape))
